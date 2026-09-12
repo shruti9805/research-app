@@ -18,8 +18,8 @@ Two rules govern everything below:
 |---|---|---|
 | `PRODUCT.md` | User | What the app is, who it's for, features, constraints. The source of truth for *what*. |
 | `PLAN.md` | You | Strategy, stack, component breakdown, status, decision log. The source of truth for *how* and *where we are*. |
-| `DECISIONS.md` | You | Full decision records. Referenced from PLAN.md. Create only when PLAN.md's decision summaries get long. |
 | `ONDEVICE-OPTIONS.md` | Reference | Verified technical research gathered before planning. Read it; don't re-derive its findings from memory. |
+| `DECISIONS.md` | You | Full decision records. Referenced from PLAN.md. Create only when PLAN.md's decision summaries get long. |
 
 Read `PRODUCT.md` at the start of every session. If it doesn't exist, ask the user to write it and offer to draft it from a conversation.
 
