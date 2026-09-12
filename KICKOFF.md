@@ -1,84 +1,89 @@
-# Setup and prompts
+# Prompts
 
-## Where each piece lives
+Copy-paste prompts for running the build. Stage 1 is complete — `PLAN.md` exists and is approved.
+**Component 1 is next.**
+
+## Where things live
 
 ```
-your-app/
-├── .claude/
-│   └── skills/
-│       └── mobile-app-builder/
-│           └── SKILL.md          ← the process. Stable, rarely edited.
-├── PRODUCT.md                    ← what you want. You write this.
-├── PLAN.md                       ← created by Claude at Stage 1, updated continuously.
-└── src/                          ← the app, from Stage 2 onward.
+research-app/
+├── .claude/skills/mobile-app-builder/SKILL.md   the process
+├── CLAUDE.md                                    persistent project context
+├── PRODUCT.md                                   what to build — yours
+├── ONDEVICE-OPTIONS.md                          verified tech research
+├── PLAN.md                                      the approved plan + current status
+├── KICKOFF.md                                   this file
+├── setup.sh                                     Component 1 scaffold script
+├── lib_main.dart                                Component 1 source (UNCOMPILED draft)
+├── questionnaire_output.xlsx                    Component 2 target
+├── samples/                                     the .docx and the filled .pdf
+└── app/                                         created by setup.sh
 ```
 
-The split matters. The skill is *how to work* and shouldn't change between projects. `PRODUCT.md` is *what to build* and is yours. `PLAN.md` is *current state* and belongs to Claude. Collapsing these into one prompt means re-pasting everything every session and watching the app description drift as you edit it in-place.
-
-**Setup:**
-
-1. `mkdir -p .claude/skills/mobile-app-builder` and put `SKILL.md` there.
-2. Copy `PRODUCT.md` to your project root and fill it in. Spend real time here — it's the highest-leverage hour in the project.
-3. `git init` if you haven't. The staged process depends on commits as checkpoints.
+Open Claude Code **in the repo root**, not in `app/`. It needs to read the docs.
 
 ---
 
-## Kickoff prompt
+## 1. Component 1 — walking skeleton
 
-Paste this once, at the start:
-
-```
-Read PRODUCT.md and ONDEVICE-OPTIONS.md, then use the mobile-app-builder skill.
-
-The decisions in PRODUCT.md §14 are settled — treat them as constraints, not
-suggestions. The findings in §11 were measured from the two sample files in
-samples/; don't re-derive them from memory, and don't generalise beyond what a
-single filled response can support.
-
-Stage 0: ask me anything in §12 I haven't answered, all at once.
-
-Stage 1: produce PLAN.md.
-
-Apply the evidence rules strictly. Every version number, library capability, API
-signature and platform policy claim gets verified against official docs or a
-command you actually ran, with source and date. Anything unverifiable gets
-labelled [INFERRED] or [UNKNOWN] — I would much rather see "I don't know" than a
-confident guess I discover is wrong in week four.
-
-For each technology decision, write the criteria before you look at the options,
-evaluate the candidates you expect to lose, and tell me what we give up and what
-would make this the wrong call.
-
-The plan must include a measurement step: parse accuracy on a hand-labelled
-sample of real responses, reported per mark type, demonstrating that residual
-error is not directionally biased. Form changes are unavailable in v1, so this
-test is the only evidence the parser is safe for research data.
-
-Do not write any code, create any scaffold, or install anything until I approve
-the plan. Stop after presenting it.
-```
-
-## Approval
-
-When the plan is right:
+First message in a new Claude Code session:
 
 ```
-APPROVED — Stage 1. Begin Stage 2 with component 1 only.
-Build it to the Definition of Done, update PLAN.md, then stop and report.
+Read PRODUCT.md, ONDEVICE-OPTIONS.md and PLAN.md, then use the
+mobile-app-builder skill.
+
+APPROVED — Stage 1. Begin Stage 2 with Component 1 only: the walking
+skeleton.
+
+Starting point: setup.sh and lib_main.dart are in the repo root. They
+were written without a Flutter SDK available and have never been
+compiled. Treat them as a draft, not as correct. Before relying on any
+API in them, check it against the installed package source in
+app/.dart_tool or the pubspec-resolved version — the installed .dart
+files are ground truth, the draft is not. Fix whatever is wrong and
+say what you changed.
+
+Component 1 is done only when all of these hold:
+- flutter build apk --release succeeds from a clean checkout
+- the APK installs on a real Android device and all four health checks
+  pass on screen
+- flutter build ipa succeeds
+- flutter analyze is clean
+- DR-007's [UNKNOWN] has a written answer in PLAN.md: can an IPA be
+  installed on another person's iPhone without a paid Apple Developer
+  account? Verify against current Apple documentation and record the
+  source URL and the date you checked it.
+- PLAN.md status updated and the work committed
+
+Evidence rules apply. Paste the actual output of every command you run
+rather than describing it. If you have not run something, say so
+plainly. Do not mark anything Done that you have not seen work.
+
+Then stop and report: what was built, what you verified and how, what
+you did NOT verify, anything you learned that changes the remaining
+plan, and what is next. Do not start Component 2.
 ```
 
-If it isn't right, say what's wrong. The skill treats anything short of clear approval as feedback, so "looks good, but I'm not sure about the state management" will get you a revision rather than a build.
+**Why the draft warning is in there.** Uncompiled code that reads confidently is the easiest thing
+to build on top of without checking, and one wrong API signature propagates through everything
+after it.
 
-## Between components
+---
+
+## 2. Between components
 
 ```
-APPROVED — component <n> looks good. Proceed to component <n+1>. Same loop:
-verify assumptions first, build to Done, update PLAN.md, stop and report.
+APPROVED — Component <n>. Proceed to Component <n+1>. Same loop:
+verify assumptions against installed sources first, build to the
+Definition of Done, update PLAN.md, then stop and report.
 ```
 
-## Resuming in a new session
+---
 
-Context doesn't persist, but the files do. This is the whole reason the plan lives on disk:
+## 3. Resuming in a new session
+
+Context doesn't persist between sessions. The files do — that is the whole reason the plan lives
+on disk.
 
 ```
 Read PRODUCT.md, ONDEVICE-OPTIONS.md and PLAN.md, then use the
@@ -88,36 +93,102 @@ Don't start work until I confirm.
 
 ---
 
-## Prompts worth having on hand
+## 4. Component-specific additions
 
-**When a claim feels too smooth:**
+Append these to the standard "proceed to Component n" prompt when you reach them.
+
+**Component 2 — docx → questionnaire model → Excel**
+
 ```
-Go back through that and label every factual claim [VERIFIED] with a source and
-date, [INFERRED], or [UNKNOWN]. Anything you can't source, say so.
+questionnaire_output.xlsx in the repo root is the verified target. It
+was generated from the real samples/Student_Survey_Bilingual.docx and
+its formulas were checked against hand-calculated construct means.
+
+Match it exactly: 10 columns, one row per question (8 demographic + 71
+items = 79 rows per response), question text in both languages, a
+single answer column holding 1-5 for Likert items and text for
+demographics, and blank reasons written into that same answer column.
+
+This is a matching exercise, not a design one. Verify by generating a
+workbook and diffing it against the target.
 ```
 
-**When a recommendation feels like a default rather than a conclusion:**
+**Component 3 — grid + row anchoring spike**
+
 ```
-Argue the strongest case for the option you rejected. If it's genuinely weaker,
-that'll be obvious — and if it isn't, I want to know that now.
+Build this as a plain Dart command-line program first, runnable on the
+Mac against samples/ — not inside the app. Iterating a parser through
+a phone rebuild is the difference between seconds and minutes.
+
+Output a rendered overlay image showing detected grid lines and row
+anchors so the result can be eyeballed, plus code-column recall as a
+number.
+
+This resolves DR-002 and DR-003. If projection profiles can't find the
+grid reliably on the real pages, say so plainly and propose the
+opencv_core fallback rather than tuning until it looks acceptable.
 ```
 
-**When "done" arrives suspiciously fast:**
-```
-Walk me through the Definition of Done item by item. For each, show me the actual
-command output. What did you not verify?
-```
+**Component 4 — mark detection + measurement harness**
 
-**Before the plan hardens:**
 ```
-What's most likely to make this plan wrong by week three? Rank the risks by how
-expensive they'd be to fix late, not by how likely they are.
+This is the component that decides whether the product works.
+
+Hand-label ground truth for all 71x6 sample cells and the four text
+fields. Report accuracy, flagger recall, and signed column-error mean
+SEPARATELY for marks and for handwriting, and separately for ticks and
+for dots. An aggregate number would hide a rightward tick bias behind
+good dot performance, and hide weak Devanagari behind strong mark
+detection.
+
+Report the real numbers. If 99% is not reachable, say so and give me
+the actual figure and the actual flag rate. Do not tune the flagger
+down to make the accuracy look better.
 ```
 
 ---
 
-## Honest note on hallucination
+## 5. Prompts worth having on hand
 
-No prompt makes a model incapable of being wrong. What this setup does is narrower and more useful: it forces every claim to carry a source, so wrong claims become *checkable* rather than invisible. The failure mode you're defending against isn't really "the model states a falsehood" — it's "the model states a falsehood in a register indistinguishable from a verified fact." Labeling separates those two, and the labeling is worth spot-checking. If you check three `[VERIFIED]` sources and they're real and say what they're claimed to say, the rest is probably fine. If one is fabricated, stop and re-verify the plan.
+**When a claim feels too smooth**
 
-The other real defense is the gates. A wrong fact caught at Stage 1 costs a conversation. The same fact caught in Stage 3 costs a rewrite.
+```
+Go back through that and label every factual claim [VERIFIED] with a
+source and date, [INFERRED], or [UNKNOWN]. Anything you can't source,
+say so.
+```
+
+**When a recommendation feels like a default rather than a conclusion**
+
+```
+Argue the strongest case for the option you rejected. If it's genuinely
+weaker that'll be obvious — and if it isn't, I want to know now.
+```
+
+**When "done" arrives suspiciously fast**
+
+```
+Walk me through the Definition of Done item by item. For each, show me
+the actual command output. What did you not verify?
+```
+
+**Before a plan change hardens**
+
+```
+Which decision record does this affect, and has its "what would change
+this" condition triggered? Propose the amendment and the changelog
+entry before you write any code.
+```
+
+---
+
+## 6. Two habits worth keeping
+
+**Spot-check the verification.** Open three `[VERIFIED]` links and confirm they say what's
+claimed. If they hold up, the rest probably does. The labels exist to make errors findable, and
+that only works if someone occasionally looks.
+
+**Insist on measurement over argument.** Form changes are unavailable in v1, so the tick bias and
+the dot ambiguity have to be handled entirely in software. The only evidence the parser is safe
+for real research data is Component 4's numbers against a hand-labelled sample. A plan step that
+produces a paragraph instead of a number hasn't been done.
