@@ -372,75 +372,49 @@ silently loses a field. `[INFERRED]`
 
 ---
 
-## 12. Open questions
+## 12. Open questions — Answered
 
-**Closed so far:** Q0 (sample files supplied), Q4 (no cloud — §14.5), Q10 (question types),
-Q11 (you author in Word, but cannot change the form now — §14.7).
+**Closed questions (2026-09-12):** Q2, Q7, Q9, Q13, Q14.
 
-### Blocking — Stage 1 cannot produce a sound plan without these
+### Your answers
 
-**Q2 — How does a response get tied to a person?** More acute now that a QR code is off the
-table (§14.7). On the real collected forms, are "Respondent Number" and "School Code" actually
-filled in? They were blank in the sample. If they're filled, they're the key. If not, identity
-has to come from batch metadata plus physical stack order, or from you typing a number per
-response — and that choice shapes the whole capture screen.
+**Q2 — How does a response tie to a person?**
+When a person uploads a new response, record responses against the student name.
 
-**Q9 — Accuracy bar and review policy.** What parse accuracy would you accept? And do you
-intend to review every parsed response, or only the ones flagged? This decides whether the app
-is a parser with a review screen or a review tool with parsing assistance — a fundamentally
-different product.
+**Q7 — Team, timeline, budget.**
+Just you, building in Claude Code. Zero budget (no app store accounts).
 
-**Q13 — Adobe Scan, or in-app capture?** Your sample came from Adobe Scan for Android, which
-already deskews and crops well. `[VERIFIED]` With no registration marks available (§14.7), the
-app is dependent on whatever corrects page geometry. Reproducing that badly in-app would be a
-step backwards; importing Adobe Scan's PDF output may be the better design. Which do you want?
+**Q9 — Accuracy bar and review policy.**
+Target 99% accuracy. You will review only responses flagged by the app as uncertain.
 
-**Q14 — Is collection finished or ongoing?** "The survey is already done" could mean the
-pilot is complete with main collection ahead, or all responses are collected and simply need
-digitising. The first is a field tool; the second is a bulk-import tool with a very different
-interface. How many responses exist on paper right now?
+**Q13 — Capture method.**
+Capture photos inside the app **or** select from the device's photo gallery (both options).
 
-**Q7 — Team, timeline, budget.** Who writes the code, and what do they already know well? This
-is usually the strongest single predictor of which framework is right. When does it need to
-work, and what can be spent on developer accounts and devices?
+**Q14 — Collection status.**
+Collection is ongoing. Currently 300 responses collected on paper; more in the field.
 
-### Important — needed before the relevant component is built
+### Blocking questions still open
 
-**Q1 — Who uses the app?** Just you, or do field enumerators also collect and upload? Does
-data from several people need to merge into one Excel?
+**Q1 — Who uses the app?** Just you, or field enumerators too? Multiple people → one Excel?
 
-**Q3 — Consent handling.** Is capturing the tick, date and place enough, or does the signature
-image itself need to be retained and retrievable per respondent for your ethics records?
+**Q3 — Consent handling.** Store signature images, or just note that consent was given?
 
-**Q5 — Where does the Excel go, and what do you analyse in?** SPSS, R, Python, Excel? The
-output layout should match the tool — SPSS and R want one row per respondent with one column
-per item code, which is not the most human-readable arrangement.
+**Q5 — Output format.** SPSS, R, Python, or Excel? Layout should match what you analyse in.
 
-**Q8 — Research ethics.** Is this under an institutional ethics board? Any rules about where
-respondent data may be stored, even on-device? Minors' data usually attracts stricter handling,
-and it affects whether the phone needs encryption at rest.
+**Q8 — Research ethics.** IRB approval? Rules about on-device data storage for minors?
 
-**Q12 — Is the printed form identical across print runs and schools?** Same Word file, same
-printer settings, same margins? If the grid lands in the same place every time, a fixed
-template match becomes possible and accuracy rises. If layout drifts, the parser must find the
-grid from scratch on every page.
+**Q12 — Form consistency.** Same Word file, same printer settings? Grid lands in same place every time?
 
-**Q15 — Are the forms grouped by school when you scan them?** The batch-metadata proposal
-(§14.6) assumes you process one school's stack at a time. If the stack is mixed, that idea
-needs rethinking.
+**Q15 — Collection flow.** Forms grouped by school when you scan, or mixed?
 
-**Q16 — One response per PDF?** The sample is `..._BP_Pujari_1.pdf`, which suggests a numbered
-series. Does each PDF hold exactly one student's response, or can several be combined?
+**Q16 — PDF structure.** One response per PDF, or several responses per PDF?
 
 ### Lower priority
 
-**Q6 — Languages.** Hindi and English only, or might other Indian languages follow? Cheap to
-design for now, expensive to retrofit.
+**Q6 — Languages.** Hindi + English only, or add others later?
 
-**Q17 — Retention of source images.** After parsing, do the photos need keeping as an audit
-trail — some ethics protocols require it — or should they be deleted to limit data held?
+**Q17 — Image retention.** Keep source photos as audit trail, or delete after parsing?
 
----
 
 ## 14. Decisions log
 
