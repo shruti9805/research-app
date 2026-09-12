@@ -1,6 +1,6 @@
 # Research Questionnaire Capture App — Build Plan
 
-Last updated: 2026-09-12 | Current stage: **1 (awaiting approval)** | Current component: none
+Last updated: 2026-09-12 | Current stage: **2** | Current component: **1 (walking skeleton) — partially done, blocked on hardware/host access; see status below**
 
 ---
 
@@ -138,10 +138,15 @@ processing, ML Kit needed, Mac available.
 
 **Decision:** **Flutter** (stable channel).
 
-**Why this wins:** C2 and C5 decide it. `google_mlkit_text_recognition` is at **0.15.1**, from
-verified publisher flutter-ml.dev, 383 likes and ~123k downloads, and explicitly supports
-Devanagari alongside Latin. `[VERIFIED: https://pub.dev/packages/google_mlkit_text_recognition,
-checked 2026-09-12]` No React Native equivalent has that combination of maintenance and reach.
+**Why this wins:** C2 and C5 decide it. `google_mlkit_text_recognition` explicitly supports
+Devanagari alongside Latin. No React Native equivalent has that combination of maintenance and
+reach. **Version re-verified 2026-09-12 at Component 1:** `flutter pub add` resolved
+**0.17.1** (was 0.15.1 when this decision was first written the same day — pub.dev had already
+moved on). Per the evidence rules, version numbers aren't stable; the installed
+`TextRecognizer`/`TextRecognitionScript` API in 0.17.1 was read directly from
+`~/.pub-cache/hosted/pub.dev/google_mlkit_text_recognition-0.17.1/lib/src/text_recognizer.dart`
+and matches `lib_main.dart`'s usage exactly, including the `devanagiri` (not "devanagari") enum
+spelling — that's the package's own spelling, not a typo in the draft.
 
 C5 matters more than it looks. The parser is the whole product, and being able to run it as a
 plain Dart program against your six sample pages on your Mac — no phone, no rebuild — is the
@@ -354,11 +359,35 @@ that point and the measurement is designed to make the call for you.
 **Android:** `flutter build apk --release`, self-signed. Anyone can install it. Solved, free.
 
 **iOS:** `flutter build ipa` produces the file on your Mac. **Installing it on other people's
-iPhones is the unresolved part.** Apple restricts installing apps outside the App Store, and the
-free-Apple-ID path has significant limits — I believe certificates expire after a short period and
-the device must be tethered to your Mac, but **I have not verified current Apple terms and I'm not
-going to assert them.** `[UNKNOWN — verify at Component 8: free provisioning profile duration,
-device limits, and whether re-signing is needed]`
+iPhones is the unresolved part.**
+
+**Resolved 2026-09-12 — no, not durably, without the paid program.** Verified directly against
+Apple's own developer documentation:
+
+- A free Apple Account lets you install and run your app on a device via Xcode, full stop —
+  Apple's own FAQ: *"Do I need to enroll in the Apple Developer Program to install apps on a
+  device? No. You can install apps on your personal device with Xcode. You'll only need to enroll
+  if you'd like to distribute apps..."* `[VERIFIED: https://developer.apple.com/support/enrollment/,
+  checked 2026-09-12]` — the free path is scoped to *your own* device connected to *your own* Mac
+  during signing, not handing someone else a file to install on their phone.
+- Free ("Personal Team") signing registers **up to 3 devices**, and *"Provisioning profiles that
+  enable apps to be installed on a device will expire 7 days from issuance. You'll need to rebuild
+  and reinstall your app to your device after expiration."*
+  `[VERIFIED: https://developer.apple.com/support/compare-memberships/, checked 2026-09-12]`
+- Distributing a built IPA so **another person installs it on their own iPhone** — ad hoc
+  distribution — is exactly the capability gated behind enrollment. The paid **Apple Developer
+  Program ($99/year)** raises the device cap to up to 100 registered devices and the signing
+  certificate is valid about a year rather than 7 days. `[VERIFIED: same two sources above +
+  cross-checked against secondary summaries, 2026-09-12]`
+
+**Practical answer for this project:** with the free path, the *other person's* iPhone (the second
+user in `[Q1]`) would need to be physically connected to your Mac and re-signed through Xcode every
+7 days — not workable for someone in the field. Ad hoc distribution to their phone as an
+independently installable IPA requires the $99/year Apple Developer Program. Given the zero-budget
+constraint `[Q7]`, the realistic v1 options are: (a) pay the $99/year, (b) run the app on the
+second user's iPhone by tethering it to your Mac and re-signing weekly, or (c) Android-only for the
+second user. **This needs your decision before Component 8 (packaging)** — flagging now since it
+was flagged as a risk in §7, not deciding it for you.
 
 Two known ML Kit build requirements to handle: **iOS deployment target 15.5 or newer**, and
 **armv7 must be excluded** in Xcode or `flutter build ipa` fails.
@@ -523,7 +552,7 @@ Ordered by risk retired, not by layer.
 
 | # | Component | Why here | Done when | Status |
 |---|---|---|---|---|
-| 1 | Walking skeleton | Toolchain and the iOS unknown (DR-007) surface on day one, not week six | Blank Flutter app builds, runs on a real Android phone from clean checkout; `flutter build ipa` succeeds on your Mac; DR-007's unknown answered in writing | Not started |
+| 1 | Walking skeleton | Toolchain and the iOS unknown (DR-007) surface on day one, not week six | Blank Flutter app builds, runs on a real Android phone from clean checkout; `flutter build ipa` succeeds on your Mac; DR-007's unknown answered in writing | **Partially done — see note below** |
 | 2 | docx → questionnaire model → Excel template | Deterministic, no images, fully verifiable against your real file; unblocks everything downstream | Parses `Student_Survey_Bilingual.docx` to exactly 71 items with correct codes and both languages; emits an Excel that opens in Excel with working construct formulas | Not started |
 | 3 | **Grid + row anchoring spike** | **The riskiest thing in the project.** Resolves DR-002 and DR-003 while the plan is still cheap to change | Runs as a plain Dart CLI over all 6 sample pages; reports code-column recall and cell-boundary accuracy with a rendered overlay to eyeball | Not started |
 | 4 | Mark detection + **handwriting recognition** + labelled measurement harness | Where S1–S3 are proven or disproven, and where DR-006's real accuracy surfaces | Hand-labelled ground truth for all 71×6 cells **and the four text fields**; harness reports accuracy, flagger recall and signed bias **separately for marks and for handwriting**; S1–S3 met or a written explanation of why not | Not started |
@@ -531,6 +560,44 @@ Ordered by risk retired, not by layer.
 | 6 | Identity + review screen | Implements DR-008 and makes flags actionable | Device-prefixed auto-ID assigned and displayed for writing on the form; printed codes stored when present; code-vs-handwriting cross-check flags disagreement; flagged items listed with the page image cropped to the row; correction writes through | Not started |
 | 7 | Store + Excel writer + merge | Turns parsed data into the thing you actually use | 300 responses round-trip; workbook opens in Excel; two device files concatenate without collision | Not started |
 | 8 | Packaging | Ship | Signed release APK installs on a non-developer Android phone; IPA built; distribution reality documented | Not started |
+
+**Component 1 status note (2026-09-12).** Built and verified in a cloud Linux sandbox, which is not
+the `Mac with Xcode` build machine assumed in §2. That environment has no Android SDK and cannot
+run Xcode at all (Apple's toolchain requires macOS). This is an execution-environment fact, not a
+code defect:
+
+| Done-when item | Result |
+|---|---|
+| Scaffold builds, deps resolve | ✅ Verified — `flutter create` + `flutter pub add` succeeded |
+| `flutter analyze` clean | ✅ Verified — real output, see session log |
+| `flutter build apk --release` | ❌ **Not achievable in this sandbox** — fails with "No Android SDK found." The Android SDK can only be fetched from `dl.google.com`, which this session's network egress policy blocks (confirmed via the proxy status endpoint, not a config issue). `flutter analyze`/`pub get` don't need it; `build apk` does. |
+| APK installs on a real Android device, 4 health checks pass on screen | ❌ Not attempted — no device attached to this sandbox, and no APK was produced to install |
+| `flutter build ipa` | ❌ **Not achievable in this sandbox, or in any Linux environment** — Apple's iOS build toolchain (Xcode) only runs on macOS |
+| DR-007 answered in writing | ✅ Done — see DR-007 above, verified against Apple's own docs |
+| PLAN.md updated, work committed | ✅ This edit |
+
+**What this means:** the code is ready, but the last two build/install verifications require your
+Mac.
+
+**Handoff — run this on your Mac to finish Component 1:**
+
+```bash
+git pull                      # get this commit
+cd app
+flutter doctor -v              # confirm Android SDK + Xcode are both found
+flutter build apk --release    # -> build/app/outputs/flutter-apk/app-release.apk
+# install app-release.apk on a real Android phone (adb install, or copy + open the file)
+# and confirm all four health checks show green on screen.
+
+# In Xcode: open ios/Runner.xcworkspace, set
+#   Runner > Build Settings > Excluded Architectures > Any iOS SDK -> armv7
+# then:
+flutter build ipa              # -> build/ios/ipa/
+```
+
+Come back and tell me the results (paste the real output) — if all six Done-when items pass, I'll
+mark Component 1 Done and we move to Component 2. If anything fails on your Mac, paste the error
+and I'll fix it before we proceed.
 
 **Component 3 is the gate.** If projection profiles can't find the grid reliably on real scans,
 DR-002 flips to `opencv_core` and the toolchain requirement changes. Better to learn that in
@@ -634,3 +701,4 @@ harder on stored page crops instead, which is weaker but workable.
 | 2026-09-12 | Q20 answered — school attendance included. All eight Part A fields captured; unanswered recorded blank. No open questions remain. |
 | 2026-09-12 | Demographic capture specified (§5.1) — all eight Part A fields, EN/HI reconciliation rules, blank-reason taxonomy (§5.2). Excel column order fixed. Q20 raised on school attendance. |
 | 2026-09-12 | Near-duplicate detection **dropped** at user's decision — duplicates prevented by operator discipline instead. Component 6 scope reduced; risk reclassified as accepted. Device prefix and write-ID-on-paper both retained, being separate concerns. |
+| 2026-09-12 | **Component 1 built and partially verified.** Flutter 3.47.4 scaffold created, dependencies added, `lib_main.dart` copied in and verified correct against installed package source (no changes needed — DR-003/DR-006 ML Kit usage matches the real 0.17.1 API). Fixed a real bug in `setup.sh`: its iOS deployment-target step targeted `ios/Podfile`, which current `flutter create` no longer generates at scaffold time, so the step silently no-op'd; rewritten to set `IPHONEOS_DEPLOYMENT_TARGET` directly in `project.pbxproj`. Replaced the stale default `test/widget_test.dart` (referenced the template's `MyApp`/counter, not `CaptureApp`). `flutter analyze` and `flutter test` both pass clean. DR-007 answered and cited. **Not verified:** `flutter build apk --release` (fails — no Android SDK; this session's network policy blocks `dl.google.com`, the only source for it) and `flutter build ipa` (impossible on any Linux host — requires Xcode/macOS). Both require your Mac; see the handoff note. Component 1 is not marked Done. |

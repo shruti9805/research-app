@@ -60,12 +60,14 @@ fi
 
 echo
 echo "==> iOS: deployment target 15.5"
-# google_ml_kit documents iOS 15.5 as the minimum platform.
-if [ -f ios/Podfile ]; then
-  sed -i '' "s/^# platform :ios.*/platform :ios, '15.5'/" ios/Podfile
-  sed -i '' "s/^platform :ios.*/platform :ios, '15.5'/" ios/Podfile
-  head -3 ios/Podfile
-fi
+# Verified 2026-09-12 against the installed google_mlkit_text_recognition
+# podspec: `s.platform = :ios, '15.5'`. As of Flutter 3.47.4, `flutter create`
+# no longer writes ios/Podfile at scaffold time -- CocoaPods now runs lazily
+# on the first iOS build -- so the guard below always skipped and this step
+# silently did nothing. The deployment target actually lives in
+# project.pbxproj, set here directly instead.
+sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 15.0;/IPHONEOS_DEPLOYMENT_TARGET = 15.5;/' ios/Runner.xcodeproj/project.pbxproj
+grep -n "IPHONEOS_DEPLOYMENT_TARGET" ios/Runner.xcodeproj/project.pbxproj
 
 echo
 echo "==> Copying Component 1 source"
