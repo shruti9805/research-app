@@ -3,7 +3,7 @@
 Last updated: 2026-09-13 | Current stage: **2** | Two tracks active — see DR-009.
 
 - **Mobile track (paused):** Component 1 (walking skeleton) — partially done, blocked on hardware/host access; see status below.
-- **Web track (active):** stopgap so the app can be tested without mobile hardware. Current component: **WT-1 (web walking skeleton)** — not started.
+- **Web track (active):** stopgap so the app can be tested without mobile hardware. **WT-1 (web walking skeleton) is Done** — live at https://shruti9805.github.io/research-app/. Current component: **WT-2 (docx → questionnaire model → Excel template)**.
 
 ---
 
@@ -714,7 +714,7 @@ Xcode, no device.
 
 | # | Component | Why here | Done when | Status |
 |---|---|---|---|---|
-| WT-1 | Web walking skeleton | Proves the toolchain and hosting before any real work | Vite+React+TS scaffold deploys to a free static host; Tesseract.js loads and recognizes a trivial string in-browser; IndexedDB read/write works; ExcelJS produces a downloadable `.xlsx` that opens correctly — all four verified with real output on the Mac | **Built and verified locally 2026-09-13 — not yet deployed; see status note below** |
+| WT-1 | Web walking skeleton | Proves the toolchain and hosting before any real work | Vite+React+TS scaffold deploys to a free static host; Tesseract.js loads and recognizes a trivial string in-browser; IndexedDB read/write works; ExcelJS produces a downloadable `.xlsx` that opens correctly — all four verified with real output on the Mac | **Done — 2026-09-13. Live at https://shruti9805.github.io/research-app/** |
 | WT-2 | docx → questionnaire model → Excel template | Same reasoning as mobile Component 2 | Parses `Student_Survey_Bilingual.docx` to exactly 71 items with correct codes and both languages via mammoth.js; emits an Excel with working construct formulas | Not started |
 | WT-3 | Grid + row anchoring spike | The riskiest thing in the web track, same as mobile Component 3 | Runs against all 6 sample pages in-browser; reports code-column recall and cell-boundary accuracy with a rendered overlay | Not started |
 | WT-4 | Mark detection + handwriting recognition + labelled measurement harness | Where DR-006's real web-track accuracy surfaces | Same Definition of Done as mobile Component 4 — accuracy and flagger recall reported separately for marks/handwriting and ticks/dots; real Tesseract.js Devanagari number, not assumed | Not started |
@@ -737,12 +737,27 @@ go-ahead to commit/push, since that's a shared, visible action):
 | ExcelJS produces a working `.xlsx` | ✅ Verified three ways: Node round-trip test (formula + cell fill both survive a re-read), `file`/`unzip` confirm a real OOXML archive, and an actual browser-triggered download (via Playwright) produces the same valid file. |
 | **Testability property (the open question DR-009 flagged)** | ✅ **Resolved, better than expected.** Tesseract.js and ExcelJS both run under plain Node/Vitest with no headless-browser shim and no `node-canvas` — stronger than the Dart CLI story mobile had. The caveat still stands for WT-3's own hand-written Canvas grid-detection code, which does need a DOM `<canvas>` (browser or a jsdom+canvas shim) — that's a separate, still-open question for WT-3. |
 | UI renders correctly | ✅ Verified via a real Playwright screenshot, not just build success — caught and fixed one real bug in the process: `index.css`'s inherited `line-height` (computed from the 18px root font) made the 56px `<h1>` overlap itself. Fixed by setting an explicit `line-height` on `h1`. |
-| Deployed to a free static host | ❌ **Not done yet.** A GitHub Actions workflow (`.github/workflows/deploy-web.yml`) is written and ready — builds on push to `main` (or manual dispatch), runs the test suite, then publishes `web/dist` to GitHub Pages at `https://shruti9805.github.io/research-app/`. Needs your go-ahead to commit and push, since pushing and enabling a repo setting are visible, shared-state actions this project's conventions ask to confirm first. |
+| Deployed to a free static host | ✅ **Done.** Live at `https://shruti9805.github.io/research-app/`, verified with a real Playwright run against the production URL — same three checks pass (OCR 96% confidence, IndexedDB round-trip, valid `.xlsx`), zero console errors. |
 
-**What this means:** WT-1's local work is done and verified with real output at every step, per
-CLAUDE.md's evidence rule. The only remaining step is yours to authorize: commit, push, and
-enable GitHub Pages on the repo (one-time repo setting). Once that's done, WT-1 is fully Done and
-WT-2 (docx → questionnaire model → Excel template) can start.
+**Deployment saga, recorded because it was a real, non-obvious obstacle:** the app code pushed
+cleanly, but GitHub rejected any push touching `.github/workflows/*` from a PAT lacking the right
+scope — twice, with two different token configurations, before landing on the actual cause:
+fine-grained PATs need **both** `Contents: Read and write` **and** `Workflows: Read and write`
+permissions to push a workflow-file change; having only one is not enough. `[VERIFIED:
+github.com/orgs/community/discussions/26254]` Worked around by committing the workflow file
+**separately from** the app code (so the app-code push never touched that path and succeeded with
+the existing credential), then adding the workflow file itself through GitHub's web UI, which
+isn't subject to PAT scope restrictions at all.
+
+Separately, the first deploy run failed with `Failed to create deployment ... Ensure GitHub Pages
+has been enabled` even after the workflow ran successfully — a known first-time race where the
+workflow can run before **Settings → Pages → Source: GitHub Actions** has actually registered.
+Re-running the same (already-green) workflow run, after confirming that setting, succeeded. Worth
+knowing if WT-8's final deploy hits the same thing.
+
+**What this means:** WT-1 is fully **Done** — built, verified locally (Node + real browser), and
+verified in production (real browser against the live URL), all with real command output at every
+step. WT-2 (docx → questionnaire model → Excel template) is next.
 
 ---
 
@@ -841,5 +856,6 @@ harder on stored page crops instead, which is weaker but workable.
 | 2026-09-12 | Demographic capture specified (§5.1) — all eight Part A fields, EN/HI reconciliation rules, blank-reason taxonomy (§5.2). Excel column order fixed. Q20 raised on school attendance. |
 | 2026-09-12 | Near-duplicate detection **dropped** at user's decision — duplicates prevented by operator discipline instead. Component 6 scope reduced; risk reclassified as accepted. Device prefix and write-ID-on-paper both retained, being separate concerns. |
 | 2026-09-12 | **Component 1 built and partially verified.** Flutter 3.47.4 scaffold created, dependencies added, `lib_main.dart` copied in and verified correct against installed package source (no changes needed — DR-003/DR-006 ML Kit usage matches the real 0.17.1 API). Fixed a real bug in `setup.sh`: its iOS deployment-target step targeted `ios/Podfile`, which current `flutter create` no longer generates at scaffold time, so the step silently no-op'd; rewritten to set `IPHONEOS_DEPLOYMENT_TARGET` directly in `project.pbxproj`. Replaced the stale default `test/widget_test.dart` (referenced the template's `MyApp`/counter, not `CaptureApp`). `flutter analyze` and `flutter test` both pass clean. DR-007 answered and cited. **Not verified:** `flutter build apk --release` (fails — no Android SDK; this session's network policy blocks `dl.google.com`, the only source for it) and `flutter build ipa` (impossible on any Linux host — requires Xcode/macOS). Both require your Mac; see the handoff note. Component 1 is not marked Done. |
+| 2026-09-13 | **WT-1 deployed and verified in production.** Live at https://shruti9805.github.io/research-app/, confirmed via a real Playwright run against the production URL (same three checks pass, zero console errors). Getting there surfaced a real, non-obvious obstacle: pushing the GitHub Actions workflow file required a PAT with **both** `Contents` and `Workflows` write permissions (fine-grained tokens split these; having only one fails with a misleading error). Worked around by committing the workflow file separately from the app code and adding it through GitHub's web UI instead. Also hit a known first-deploy race (`Ensure GitHub Pages has been enabled`) — resolved by confirming Settings → Pages → Source is GitHub Actions, then re-running the workflow. WT-1 is fully Done; WT-2 is next. |
 | 2026-09-13 | **WT-1 built and verified locally.** Vite+React+TS scaffold created; pinned Vite to 7.3.6 and TypeScript to ^7.0.2 after the default `npm create vite@latest` pulled Vite 8.3.0, whose new Rolldown bundler failed to load its native binding on this Mac (a known npm optional-dependency bug) — chose the mature Rollup/esbuild pipeline instead, same posture as DR-002. Built and verified, with real output at each step: Tesseract.js OCR (Node + real browser, both passed, 92–96% confidence), IndexedDB round-trip (browser), ExcelJS workbook with a live formula and a filled cell (Node round-trip + real browser download, both valid `.xlsx` files). Found and fixed one real CSS bug (`h1` line-height) caught via an actual Playwright screenshot, not just a successful build. Resolved the open testability question from DR-009: Tesseract.js and ExcelJS both run under plain Node/Vitest with no browser shim — WT-3's own Canvas-based grid detection still needs one, that question stays open for WT-3. Not yet deployed — a GitHub Actions → GitHub Pages workflow is written and ready, pending the user's go-ahead to commit/push. |
 | 2026-09-13 | **DR-009 added — web stopgap track.** User cannot currently test mobile builds (no Mac/Xcode/Android SDK access in this session). Rather than replace the mobile plan, added a **parallel, paused-not-deleted** web track: plain TypeScript (Vite+React), not Flutter Web, because ML Kit — load-bearing for DR-003 and DR-006 — has no web build at all `[VERIFIED]`. Confirmed with the user: (1) stopgap, not replacement — DR-001 and DR-007 status changed to Paused; (2) plain TS/React over Flutter Web; (3) DR-006 handwriting recognition stands, with the heightened Tesseract.js-vs-Devanagari risk named explicitly; (4) deploy to a free static host (GitHub Pages/Netlify) rather than local-only. Library substitutions recorded in DR-009 (Tesseract.js, hand-written Canvas TS with OpenCV.js as an unverified fallback, mammoth.js, ExcelJS, IndexedDB). New §6.1 web-track (WT-1..WT-8) component table added, mirroring §6's risk-first order. Two new risks added to §7: Tesseract.js's weaker Devanagari-handwriting accuracy, and the accepted cost of eventually re-implementing the parser in Dart if the mobile track resumes. No code written yet — WT-1 is the next component, to be built and verified separately. |
