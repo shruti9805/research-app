@@ -1,0 +1,18 @@
+name: questionnaire_parser
+description: >
+  Pure-Dart parser for the questionnaire .docx and photographed responses.
+  No Flutter dependency — runs as a CLI for fast iteration against samples/.
+publish_to: "none"
+version: 0.1.0
+
+environment:
+  sdk: ^3.13.0
+
+dependencies:
+  archive: ^3.6.1
+  xml: ^6.6.1
+  excel: ^4.0.6
+
+dev_dependencies:
+  test: ^1.25.0
+  lints: ^5.0.0
