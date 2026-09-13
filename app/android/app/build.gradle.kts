@@ -34,8 +34,20 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
+}
+
+dependencies {
+    // google_mlkit_text_recognition bundles Latin by default and marks every other
+    // script compileOnly (see its android/build.gradle) — each script an app actually
+    // uses must be added here explicitly, per the plugin's own README. DR-003 needs
+    // Latin (already default) and DR-006 needs Devanagari.
+    implementation("com.google.mlkit:text-recognition-devanagari:16.0.1")
 }
 
 kotlin {

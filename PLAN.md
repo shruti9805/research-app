@@ -2,7 +2,7 @@
 
 Last updated: 2026-09-13 | Current stage: **2** | Two tracks active — see DR-009.
 
-- **Mobile track (paused):** Component 1 (walking skeleton) — partially done, blocked on hardware/host access; see status below.
+- **Mobile track (active again, 2026-09-13):** user chose to shift back to mobile after WT-3's web-track OCR accuracy came back too low. Toolchain now installed on the real Mac (Flutter, JDK, Android SDK); `flutter build apk --release` succeeds (78.2MB, real ML Kit dependency bug found and fixed). Component 1 not yet fully Done — device-level verification (4 health checks on screen) still pending, no physical Android device or working emulator yet. See Component 1 status note below.
 - **Web track (active):** stopgap so the app can be tested without mobile hardware. **WT-1 and WT-2 are Done** — live at https://shruti9805.github.io/research-app/. **WT-3 (grid + row anchoring spike) is spiked but not resolved** — real measurement (35.2% code-column recall) triggers both DR-002's and DR-003's documented fallback conditions; this is a decision point for the user, not a pass. See §6.1's WT-3 status note.
 
 ---
@@ -697,8 +697,8 @@ code defect:
 |---|---|
 | Scaffold builds, deps resolve | ✅ Verified — `flutter create` + `flutter pub add` succeeded |
 | `flutter analyze` clean | ✅ Verified — real output, see session log |
-| `flutter build apk --release` | ❌ **Not achievable in this sandbox** — fails with "No Android SDK found." The Android SDK can only be fetched from `dl.google.com`, which this session's network egress policy blocks (confirmed via the proxy status endpoint, not a config issue). `flutter analyze`/`pub get` don't need it; `build apk` does. |
-| APK installs on a real Android device, 4 health checks pass on screen | ❌ Not attempted — no device attached to this sandbox, and no APK was produced to install |
+| `flutter build apk --release` | ✅ **Done on the real Mac, 2026-09-13** — see status note below. Was blocked here in the cloud sandbox; not a code defect. |
+| APK installs on a real Android device, 4 health checks pass on screen | ⚠️ **Partially done — no device or emulator available yet.** See 2026-09-13 note below. |
 | `flutter build ipa` | ❌ **Not achievable in this sandbox, or in any Linux environment** — Apple's iOS build toolchain (Xcode) only runs on macOS |
 | DR-007 answered in writing | ✅ Done — see DR-007 above, verified against Apple's own docs |
 | PLAN.md updated, work committed | ✅ This edit |
@@ -725,6 +725,47 @@ flutter build ipa              # -> build/ios/ipa/
 Come back and tell me the results (paste the real output) — if all six Done-when items pass, I'll
 mark Component 1 Done and we move to Component 2. If anything fails on your Mac, paste the error
 and I'll fix it before we proceed.
+
+**Component 1 status note (2026-09-13) — real Mac, real build.** The user asked to shift focus
+back to mobile, since the web track's Tesseract.js OCR accuracy (WT-3) came back too low to be
+usable. This session is running directly on the user's own Mac (not the cloud sandbox), so the
+actual toolchain gap could finally be closed rather than just documented:
+
+- **Flutter SDK:** not installed. Cloned stable channel directly (no sudo needed) to
+  `~/development/flutter` — Flutter 3.47.4, matching what Component 1 was built against.
+- **Java:** no JDK on this Mac at all (`java -version` failed outright). Installed Temurin JDK 17
+  (Eclipse Adoptium) to `~/development/jdk` — `sdkmanager` and Gradle both need a real JVM.
+- **Android SDK:** not installed, no Homebrew either (Homebrew's installer needs `sudo`, which
+  can't be supplied non-interactively in this session). Installed the SDK command-line tools
+  directly from Google (no sudo needed) to `~/Library/Android/sdk`.
+- **Real finding: the SDK versions this project was built against (`android-34`, build-tools
+  `34.0.0`) are not what Flutter 3.47.4 actually wants.** `flutter doctor -v` said plainly:
+  *"Flutter requires Android SDK 36 and the Android BuildTools 28.0.3."* Installed those; doctor's
+  Android toolchain check went from `[!]` to `[✓]`. A concrete example of why "check the installed
+  version, don't recall it" matters even for tooling requirements, not just library APIs.
+- **Real finding: `flutter build apk --release` failed on R8 (Android's code shrinker), not on
+  anything specific to this app's own code.** `google_mlkit_text_recognition`'s Android side
+  bundles the Latin script model by default and marks every other script (Chinese, Devanagari,
+  Japanese, Korean) `compileOnly` in its own `build.gradle` — meaning the plugin's Kotlin bridge
+  code *references* those classes unconditionally, but they're only actually placed on the
+  classpath if the **consuming app** adds them as real dependencies. This app needs Devanagari
+  (DR-006) but not Chinese/Japanese/Korean. Fixed per the plugin's own documented instructions:
+  added `implementation("com.google.mlkit:text-recognition-devanagari:16.0.1")` to
+  `app/android/app/build.gradle.kts`, plus a new `proguard-rules.pro` with `-dontwarn` rules for
+  the three scripts this app deliberately doesn't bundle (so R8 stops trying to resolve classes
+  that are correctly absent, rather than failing the whole build over them).
+- **Result: `flutter build apk --release` succeeds.** Real output: `✓ Built
+  build/app/outputs/flutter-apk/app-release.apk (78.2MB)` — confirmed a real, valid zip archive.
+  78MB matches the ~76MB estimate in §7's risk table for bundling both Latin and Devanagari models.
+- **Not yet done: installing on a real device and confirming the four health checks on screen.**
+  No physical Android device is available in this session. An emulator system image
+  (`system-images;android-34;google_apis;arm64-v8a`, ~1GB+) was attempted as a substitute and
+  **failed three times with "Connection reset"** at different points (11%, 25%, 28%) — a real,
+  reproduced network-reliability problem for large sustained downloads in this environment, not a
+  one-off blip. Disk space is also down to ~18GB free after everything else installed, worth
+  watching before attempting large downloads again. This step needs either a physical device, a
+  more reliable network path for the emulator image, or acceptance that build-success is the
+  verification available for now.
 
 **Component 3 is the gate.** If projection profiles can't find the grid reliably on real scans,
 DR-002 flips to `opencv_core` and the toolchain requirement changes. Better to learn that in
@@ -940,6 +981,7 @@ harder on stored page crops instead, which is weaker but workable.
 | 2026-09-12 | Demographic capture specified (§5.1) — all eight Part A fields, EN/HI reconciliation rules, blank-reason taxonomy (§5.2). Excel column order fixed. Q20 raised on school attendance. |
 | 2026-09-12 | Near-duplicate detection **dropped** at user's decision — duplicates prevented by operator discipline instead. Component 6 scope reduced; risk reclassified as accepted. Device prefix and write-ID-on-paper both retained, being separate concerns. |
 | 2026-09-12 | **Component 1 built and partially verified.** Flutter 3.47.4 scaffold created, dependencies added, `lib_main.dart` copied in and verified correct against installed package source (no changes needed — DR-003/DR-006 ML Kit usage matches the real 0.17.1 API). Fixed a real bug in `setup.sh`: its iOS deployment-target step targeted `ios/Podfile`, which current `flutter create` no longer generates at scaffold time, so the step silently no-op'd; rewritten to set `IPHONEOS_DEPLOYMENT_TARGET` directly in `project.pbxproj`. Replaced the stale default `test/widget_test.dart` (referenced the template's `MyApp`/counter, not `CaptureApp`). `flutter analyze` and `flutter test` both pass clean. DR-007 answered and cited. **Not verified:** `flutter build apk --release` (fails — no Android SDK; this session's network policy blocks `dl.google.com`, the only source for it) and `flutter build ipa` (impossible on any Linux host — requires Xcode/macOS). Both require your Mac; see the handoff note. Component 1 is not marked Done. |
+| 2026-09-13 | **Shifted back to the mobile track; real Android toolchain set up from scratch on the actual Mac.** User rejected the web track's OCR accuracy (WT-3, 35.2% recall) and asked to focus on mobile instead. Installed Flutter 3.47.4, Temurin JDK 17, and the Android SDK directly (no sudo/Homebrew needed). Found and fixed a real bug: Flutter 3.47.4 wants Android SDK 36 + build-tools 28.0.3, not 34/34.0.0. Found and fixed a real R8 build failure: `google_mlkit_text_recognition` marks non-Latin scripts `compileOnly`, so Devanagari needed an explicit dependency add (per the plugin's own README) and Chinese/Japanese/Korean needed `-dontwarn` ProGuard rules for the scripts this app deliberately excludes. `flutter build apk --release` now succeeds — a real 78.2MB APK, matching the expected size for bundling Latin + Devanagari models. Device-level verification (installing on a real phone, confirming the four health checks) is still pending: no physical device available, and an emulator system image failed three times with real, reproduced "Connection reset" errors. |
 | 2026-09-13 | **Paused on the user's request to document state for a clean resume, not to pick a WT-3 direction.** User asked whether ML Kit could replace Tesseract.js for the web track — verified no (ML Kit has no web/JS build, Android/iOS-native only, the reason DR-009 chose Tesseract.js in the first place). Four options were laid out (improve Tesseract preprocessing; switch to a cloud OCR API, which reverses §14.5; pause web and resume mobile once hardware access exists; accept the gap and revisit with more samples) — none chosen. Added a "Resume point" section at the top of this file so a future session picks this up correctly without redoing the WT-3 investigation. |
 | 2026-09-13 | **WT-3 spiked against the real filled response PDF — real number, not a pass.** Code-column recall (DR-003): 35.2% (25/71), reproduced twice, after trying 2x vs 4x render scale (14.1%→35.2%) and whole-page vs Code-column-cropped OCR (cropping made it *worse*, 35.2%→16.9%, with real Tesseract errors). Grid/cell-boundary detection (DR-002): naive full-width projection profiles found zero lines on the real scan (lines are thin, gray, and fragmented by scan noise); gap-bridging + longest-run recovered a real but partial signal (one line's continuity went from 39%→91% after bridging), not a reliable full grid. Verified with a rendered red/green overlay — matches are positionally correct when they fire, the problem is coverage. Both DR-002's and DR-003's own documented fallback-trigger conditions (OpenCV.js; <~95% recall) are now met by measurement. Not resolving this unilaterally — it's a real architecture decision point, written up in §6.1's WT-3 status note with options, pending the user's call. |
 | 2026-09-13 | **WT-2 built and verified against the real questionnaire file.** Inspected the real mammoth-converted HTML first (not assumed) to confirm table structure and the exact 12-construct/71-item breakdown from PRODUCT.md §11.1, then wrote `parseQuestionnaireDocx` to match it and throw rather than silently mis-parse if it doesn't. Verified three ways: unit tests against the real docx (71 unique items, correct construct counts, correct English/Hindi split), a real-data Excel-template check (`ER_mean`/`PC_mean` formulas reference the exact right column ranges), and a real browser upload-and-download via Playwright. Hit the same "brand-new major version breaks on this Mac's Node" pattern as WT-1's Vite issue — jsdom 30 requires Node ≥22.22, pinned to jsdom 26.1.0 instead. WT-2 is Done; WT-3 (grid + row anchoring spike) is next. |
