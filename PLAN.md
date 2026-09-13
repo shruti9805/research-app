@@ -3,7 +3,7 @@
 Last updated: 2026-09-13 | Current stage: **2** | Two tracks active — see DR-009.
 
 - **Mobile track (paused):** Component 1 (walking skeleton) — partially done, blocked on hardware/host access; see status below.
-- **Web track (active):** stopgap so the app can be tested without mobile hardware. **WT-1 and WT-2 are Done** — live at https://shruti9805.github.io/research-app/. Current component: **WT-3 (grid + row anchoring spike)**.
+- **Web track (active):** stopgap so the app can be tested without mobile hardware. **WT-1 and WT-2 are Done** — live at https://shruti9805.github.io/research-app/. **WT-3 (grid + row anchoring spike) is spiked but not resolved** — real measurement (35.2% code-column recall) triggers both DR-002's and DR-003's documented fallback conditions; this is a decision point for the user, not a pass. See §6.1's WT-3 status note.
 
 ---
 
@@ -716,7 +716,7 @@ Xcode, no device.
 |---|---|---|---|---|
 | WT-1 | Web walking skeleton | Proves the toolchain and hosting before any real work | Vite+React+TS scaffold deploys to a free static host; Tesseract.js loads and recognizes a trivial string in-browser; IndexedDB read/write works; ExcelJS produces a downloadable `.xlsx` that opens correctly — all four verified with real output on the Mac | **Done — 2026-09-13. Live at https://shruti9805.github.io/research-app/** |
 | WT-2 | docx → questionnaire model → Excel template | Same reasoning as mobile Component 2 | Parses `Student_Survey_Bilingual.docx` to exactly 71 items with correct codes and both languages via mammoth.js; emits an Excel with working construct formulas | **Done — 2026-09-13** |
-| WT-3 | Grid + row anchoring spike | The riskiest thing in the web track, same as mobile Component 3 | Runs against all 6 sample pages in-browser; reports code-column recall and cell-boundary accuracy with a rendered overlay | Not started |
+| WT-3 | Grid + row anchoring spike | The riskiest thing in the web track, same as mobile Component 3 | Runs against all 6 sample pages in-browser; reports code-column recall and cell-boundary accuracy with a rendered overlay | **Spiked — 2026-09-13. Real number: 35.2% code-column recall, well below what's usable. See status note below — this is a real finding needing your decision, not a completed component.** |
 | WT-4 | Mark detection + handwriting recognition + labelled measurement harness | Where DR-006's real web-track accuracy surfaces | Same Definition of Done as mobile Component 4 — accuracy and flagger recall reported separately for marks/handwriting and ticks/dots; real Tesseract.js Devanagari number, not assumed | Not started |
 | WT-5 | Capture flow | First user-facing piece | File-input camera capture and gallery pick both work, tested on a phone browser and a desktop browser | Not started |
 | WT-6 | Identity + review screen | Implements DR-008 in the browser | Browser-prefixed auto-ID assigned and displayed; flagged items listed with the page image cropped to the row; correction writes through | Not started |
@@ -725,6 +725,47 @@ Xcode, no device.
 
 **WT-1 is the immediate priority** — it directly answers "I can't test mobile app currently,"
 verifiable with `npm run dev` and a browser tab, no native toolchain.
+
+**WT-3 status note (2026-09-13) — the honest one, per CLAUDE.md's rule not to tune findings to
+look better.** Ran against the real `samples/Student_Questionnaire_BP_Pujari_1.pdf` (all 6 pages,
+in-browser, with a rendered overlay — real output at every step, not simulated):
+
+| Done-when item | Result |
+|---|---|
+| Runs against all 6 real pages in-browser | ✅ Done — pdf.js renders each page to canvas; verified with a real Playwright run and saved overlay screenshots. |
+| Code-column recall (DR-003) | ⚠️ **25 / 71 = 35.2%.** Real, reproduced-twice number. Nowhere near the ~95% DR-003 names as its own fallback trigger. |
+| Cell-boundary / grid accuracy (DR-002) | ⚠️ **Unreliable.** Most page-halves detect 0 row/column lines; a few detect a handful, inconsistently. |
+| Rendered overlay to eyeball | ✅ Done — red = detected grid lines, green = OCR-matched codes. Screenshots confirm the mechanism is *correct* when it fires (spot-checked several matches, e.g. EM_1/EM_2/EM_3, TC_3/TC_4/TC_5, DI_3, DP_1 — all at the exactly right row) — the problem is coverage, not correctness. |
+
+**What was tried, in order, each with a real measured before/after (not guessed):**
+
+1. **Naive full-width row/column projection profiles** (the originally-planned DR-002 approach): **0 lines found anywhere.** Real scanned ruled lines turned out to be thin, gray, and fragmented by scan/compression noise — nowhere near solid enough for a simple "% of row/column that's dark" threshold. Verified by direct pixel inspection, not assumed.
+2. **Gap-bridging (small-neighborhood morphological dilation) + longest-contiguous-run instead of total count**: recovered a real, strong signal for the *few strongest* lines (one line hit 90.7% of its expected span after bridging, versus 39% before) — enough to find, at best, a handful of lines per page-half, not a full grid.
+3. **Code-column OCR (DR-003) at 2x render scale (≈144dpi): 14.1% recall.**
+4. **Same, at 4x render scale (≈288dpi, closer to the source scan's actual resolution): 35.2% recall** — a real improvement, still far short.
+5. **Cropping the OCR to just the Code column** (the originally-planned DR-003 design, rather than whole-page OCR): **made it worse — 16.9%**, with Tesseract erroring outright on some lines ("Image too small to scale"). A genuine negative result, kept in the code as a documented dead end rather than quietly dropped.
+
+**What this means, plainly:** both DR-002's and DR-003's own documented fallback-trigger conditions
+are met by real measurement. DR-002 says: *"if the grid-detection spike fails on real pages with
+projection profiles, switch to `opencv_core`."* DR-003 says: *"if code-column recall falls below
+~95% on the sample pages, fall back to ruled-line row segmentation with a count check against the
+expected 71."* Both conditions are now true, and it's worth noting neither fallback fully rescues
+the other here — ruled-line segmentation is exactly what's failing.
+
+**This is a decision point, not a completed component** — per CLAUDE.md's rule to stop and report
+rather than silently pick a path when reality contradicts the plan. Options, none yet chosen:
+
+- Try **OpenCV.js** (the documented DR-002 fallback) for grid detection — untried so far; may
+  handle the noisy real scan better than hand-written projection profiles.
+- Investigate *why* OCR recall is low before concluding Tesseract.js itself is the bottleneck —
+  candidates not yet tried: image preprocessing (deskew/contrast) before OCR, a different PSM
+  (page segmentation mode) tuned for sparse table text, or per-row-band OCR once row lines are
+  found some other way.
+- Accept a lower recall and lean harder on the flagging/review workflow (more items reach manual
+  review) — a real product tradeoff, not a technical one.
+- Revisit whether this is a one-form problem (recalibrate on more real samples once more exist)
+  or a Tesseract.js ceiling (would affect DR-006's handwriting recognition too, since it's the
+  same engine).
 
 **WT-2 status note (2026-09-13).** Built and verified against the real `samples/Student_Survey_Bilingual.docx`, not a synthetic fixture:
 
@@ -869,6 +910,7 @@ harder on stored page crops instead, which is weaker but workable.
 | 2026-09-12 | Demographic capture specified (§5.1) — all eight Part A fields, EN/HI reconciliation rules, blank-reason taxonomy (§5.2). Excel column order fixed. Q20 raised on school attendance. |
 | 2026-09-12 | Near-duplicate detection **dropped** at user's decision — duplicates prevented by operator discipline instead. Component 6 scope reduced; risk reclassified as accepted. Device prefix and write-ID-on-paper both retained, being separate concerns. |
 | 2026-09-12 | **Component 1 built and partially verified.** Flutter 3.47.4 scaffold created, dependencies added, `lib_main.dart` copied in and verified correct against installed package source (no changes needed — DR-003/DR-006 ML Kit usage matches the real 0.17.1 API). Fixed a real bug in `setup.sh`: its iOS deployment-target step targeted `ios/Podfile`, which current `flutter create` no longer generates at scaffold time, so the step silently no-op'd; rewritten to set `IPHONEOS_DEPLOYMENT_TARGET` directly in `project.pbxproj`. Replaced the stale default `test/widget_test.dart` (referenced the template's `MyApp`/counter, not `CaptureApp`). `flutter analyze` and `flutter test` both pass clean. DR-007 answered and cited. **Not verified:** `flutter build apk --release` (fails — no Android SDK; this session's network policy blocks `dl.google.com`, the only source for it) and `flutter build ipa` (impossible on any Linux host — requires Xcode/macOS). Both require your Mac; see the handoff note. Component 1 is not marked Done. |
+| 2026-09-13 | **WT-3 spiked against the real filled response PDF — real number, not a pass.** Code-column recall (DR-003): 35.2% (25/71), reproduced twice, after trying 2x vs 4x render scale (14.1%→35.2%) and whole-page vs Code-column-cropped OCR (cropping made it *worse*, 35.2%→16.9%, with real Tesseract errors). Grid/cell-boundary detection (DR-002): naive full-width projection profiles found zero lines on the real scan (lines are thin, gray, and fragmented by scan noise); gap-bridging + longest-run recovered a real but partial signal (one line's continuity went from 39%→91% after bridging), not a reliable full grid. Verified with a rendered red/green overlay — matches are positionally correct when they fire, the problem is coverage. Both DR-002's and DR-003's own documented fallback-trigger conditions (OpenCV.js; <~95% recall) are now met by measurement. Not resolving this unilaterally — it's a real architecture decision point, written up in §6.1's WT-3 status note with options, pending the user's call. |
 | 2026-09-13 | **WT-2 built and verified against the real questionnaire file.** Inspected the real mammoth-converted HTML first (not assumed) to confirm table structure and the exact 12-construct/71-item breakdown from PRODUCT.md §11.1, then wrote `parseQuestionnaireDocx` to match it and throw rather than silently mis-parse if it doesn't. Verified three ways: unit tests against the real docx (71 unique items, correct construct counts, correct English/Hindi split), a real-data Excel-template check (`ER_mean`/`PC_mean` formulas reference the exact right column ranges), and a real browser upload-and-download via Playwright. Hit the same "brand-new major version breaks on this Mac's Node" pattern as WT-1's Vite issue — jsdom 30 requires Node ≥22.22, pinned to jsdom 26.1.0 instead. WT-2 is Done; WT-3 (grid + row anchoring spike) is next. |
 | 2026-09-13 | **WT-1 deployed and verified in production.** Live at https://shruti9805.github.io/research-app/, confirmed via a real Playwright run against the production URL (same three checks pass, zero console errors). Getting there surfaced a real, non-obvious obstacle: pushing the GitHub Actions workflow file required a PAT with **both** `Contents` and `Workflows` write permissions (fine-grained tokens split these; having only one fails with a misleading error). Worked around by committing the workflow file separately from the app code and adding it through GitHub's web UI instead. Also hit a known first-deploy race (`Ensure GitHub Pages has been enabled`) — resolved by confirming Settings → Pages → Source is GitHub Actions, then re-running the workflow. WT-1 is fully Done; WT-2 is next. |
 | 2026-09-13 | **WT-1 built and verified locally.** Vite+React+TS scaffold created; pinned Vite to 7.3.6 and TypeScript to ^7.0.2 after the default `npm create vite@latest` pulled Vite 8.3.0, whose new Rolldown bundler failed to load its native binding on this Mac (a known npm optional-dependency bug) — chose the mature Rollup/esbuild pipeline instead, same posture as DR-002. Built and verified, with real output at each step: Tesseract.js OCR (Node + real browser, both passed, 92–96% confidence), IndexedDB round-trip (browser), ExcelJS workbook with a live formula and a filled cell (Node round-trip + real browser download, both valid `.xlsx` files). Found and fixed one real CSS bug (`h1` line-height) caught via an actual Playwright screenshot, not just a successful build. Resolved the open testability question from DR-009: Tesseract.js and ExcelJS both run under plain Node/Vitest with no browser shim — WT-3's own Canvas-based grid detection still needs one, that question stays open for WT-3. Not yet deployed — a GitHub Actions → GitHub Pages workflow is written and ready, pending the user's go-ahead to commit/push. |

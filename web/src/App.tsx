@@ -4,6 +4,7 @@ import { storageRoundTrip } from './lib/storage'
 import { buildHealthCheckWorkbook } from './lib/excel'
 import { parseQuestionnaireDocx, type Questionnaire } from './lib/questionnaire'
 import { buildQuestionnaireTemplate } from './lib/questionnaireExcel'
+import GridSpike from './components/GridSpike'
 import './App.css'
 
 type CheckStatus = 'pending' | 'pass' | 'fail'
@@ -100,6 +101,7 @@ export default function App() {
       </button>
 
       <QuestionnaireImport />
+      <GridSpike />
     </main>
   )
 }
