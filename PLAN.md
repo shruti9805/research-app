@@ -1,6 +1,9 @@
 # Research Questionnaire Capture App — Build Plan
 
-Last updated: 2026-09-12 | Current stage: **2** | Current component: **1 (walking skeleton) — partially done, blocked on hardware/host access; see status below**
+Last updated: 2026-09-13 | Current stage: **2** | Two tracks active — see DR-009.
+
+- **Mobile track (paused):** Component 1 (walking skeleton) — partially done, blocked on hardware/host access; see status below.
+- **Web track (active):** stopgap so the app can be tested without mobile hardware. Current component: **WT-1 (web walking skeleton)** — not started.
 
 ---
 
@@ -112,7 +115,7 @@ S1 is the important one. S2 without S1 is a dataset you cannot trust.
 
 ### DR-001: Cross-platform framework
 
-**Status:** Proposed | **Date:** 2026-09-12
+**Status:** Paused — see DR-009 (2026-09-13) | **Date:** 2026-09-12
 
 **Context:** Solo non-developer builder, zero budget, both platforms required, heavy image
 processing, ML Kit needed, Mac available.
@@ -354,7 +357,7 @@ that point and the measurement is designed to make the call for you.
 
 ### DR-007: Packaging and distribution
 
-**Status:** Proposed, **with one unresolved blocker** | **Date:** 2026-09-12
+**Status:** Paused — see DR-009 (2026-09-13) | **Date:** 2026-09-12
 
 **Android:** `flutter build apk --release`, self-signed. Anyone can install it. Solved, free.
 
@@ -452,6 +455,100 @@ switching the key to those codes restores traceability and duplicate detection f
 generated ID can stay as a secondary column, so the switch stays cheap.
 
 **Confidence:** High. This works unconditionally, which is its main virtue.
+
+---
+
+### DR-009: Web stopgap track
+
+**Status:** Decided by user 2026-09-13 | **Date:** 2026-09-13
+
+**Context:** Component 1 is blocked on Mac/Xcode/Android-SDK access the user doesn't currently
+have. The user asked for a web app usable on any device so work can be tested now.
+
+**Decision:** Build a **parallel, stopgap web track**, not a replacement. The Flutter/mobile
+plan (DR-001..DR-008) stays the eventual target and is **paused**, not deleted — see the status
+lines on DR-001 and DR-007. The web track is built in **plain TypeScript** (Vite + React + TS),
+not Flutter Web, and deployed to a **free static host** (GitHub Pages or Netlify).
+
+**Why not Flutter Web:** Google's ML Kit — load-bearing for DR-003 (row anchoring) and DR-006
+(handwriting) — has no web build at all. `[VERIFIED: pub.dev/GitHub — "Google's ML Kit was built
+only for mobile platforms... Web or any other platform is not supported"]` Flutter Web would
+still need a from-scratch OCR replacement wired in through JS interop, so it keeps Flutter's
+learning curve while giving up ML Kit, the thing DR-001 chose Flutter *for*. Going straight to
+TypeScript gets the same OCR substitution with a more mature ecosystem around it (OCR, canvas
+image processing, Excel writing), at the cost of eventually re-implementing the parser twice —
+once in TS now, once in Dart if/when the mobile track resumes. That cost is accepted knowingly,
+not overlooked.
+
+**Library substitutions** — each mobile-track dependency that was ML-Kit- or Flutter-specific
+gets a web equivalent:
+
+| Concern | Mobile track (paused) | Web track (new) | Verification |
+|---|---|---|---|
+| Printed-text OCR (DR-003) + handwriting (DR-006) | `google_mlkit_text_recognition` 0.17.1 | **Tesseract.js** v7.0.0, WASM, fully client-side | `[VERIFIED: npm — current version, WASM core, no server call]` |
+| Image processing (DR-002) | Pure-Dart `image` package, hand-written algorithms | Hand-written TS over Canvas `ImageData`, same projection-profile / connected-component approach | `[INFERRED: same reasoning as DR-002 — the form is fully ruled, so it doesn't need a CV library]` |
+| Image processing fallback | `opencv_core` if Component 3 fails | **OpenCV.js** (official WASM build) if WT-3 fails | `[UNKNOWN — maturity not yet verified; check only if the hand-written approach fails, same trigger condition as DR-002]` |
+| .docx parsing (Component 2) | Not yet built | **mammoth.js** (`.convertToHtml` / `.extractRawText`) for table structure | `[VERIFIED: npm/GitHub — supports tables in docx-to-HTML conversion]` |
+| Excel writing | Not yet chosen | **ExcelJS** — writes formulas (construct means) and cell fill styling (flagged-cell highlighting), free | `[VERIFIED: npm — read/write + formulas + styling, no server]`. SheetJS considered; its free tier has weaker styling support, needed for flagged cells. |
+| Local storage (SQLite equivalent) | Not yet chosen | **IndexedDB**, via a thin wrapper (e.g. Dexie.js) | `[INFERRED: standard browser persistence choice]` |
+| Camera capture | Not yet built | **Two separate inputs**, per Q13's "camera or gallery, both options" requirement: (a) a file input with the `capture` attribute, opens the camera app directly on both iOS Safari and Android Chrome; (b) a plain file input with no `capture` attribute, opens the normal photo/file picker on both platforms | `[VERIFIED: MDN + web.dev — capture attribute works on iOS and Android to launch the camera; caniuse reports ~97% mobile coverage; ignored on desktop, where both inputs just open a file picker]` |
+| Distribution | APK/IPA (DR-007, paused) | Static deploy to GitHub Pages or Netlify free tier | `[VERIFIED: both have zero-cost static-hosting tiers]` |
+
+**Deployment mechanism, decided:** **GitHub Pages**, not Netlify — the repo already exists at
+`github.com/shruti9805/research-app` `[VERIFIED: git remote -v]`, so Pages needs no new account
+or third-party service, just a setting on the existing repo. A GitHub Actions workflow
+(`actions/upload-pages-artifact` + `actions/deploy-pages`) builds the Vite app and deploys `dist/`
+automatically on every push to the branch it's configured for. `[VERIFIED: current GitHub Actions
+docs/examples]` The site will be reachable at `https://shruti9805.github.io/research-app/` — this
+requires setting Vite's `base` config and `homepage` to that subpath, not root, since it's a
+project site rather than a `<username>.github.io` repo. Built at WT-1 (first bare-bones deploy,
+to prove the pipeline) and finalized at WT-8.
+
+**Camera-capture caveats, verified while researching the row above:**
+- On Android, the camera-preference hint (`capture="environment"` for back camera specifically)
+  is not reliably honored — only the bare `capture` attribute reliably opens *a* camera app.
+  `[VERIFIED: MDN browser-compat-data issue]` Not a blocker, but the plan shouldn't claim a
+  guaranteed rear-camera default.
+- There is a documented Android 14/15 + Chrome regression where the camera option can disappear
+  from a file input depending on the exact `accept` value used, with a known workaround.
+  `[VERIFIED]` Exactly the kind of platform behavior CLAUDE.md says to check, not recall — **WT-5
+  must verify capture on a real, current Android device**, not assume the baseline holds.
+- iOS Safari requires the input to be triggered by a direct, synchronous user gesture (tap →
+  immediate `.click()` on the input, no `await` in between) or the camera won't open.
+  `[VERIFIED: Apple developer forums + web.dev]`
+
+**DR-006 stands, with a heightened risk named plainly.** The user chose to keep handwriting
+recognition for school/district/class rather than fall back to batch metadata. Tesseract.js is
+reported weaker than ML Kit specifically at handwriting and at Devanagari conjuncts.
+`[VERIFIED: search results — "Hindi language recognition accuracy is quite low even for the
+printed text... conjunct character combinations... not easily separable"]` WT-4 measures the
+real number, same honest-measurement discipline as mobile Component 4 — no invented figures, no
+tuning the flagger to hide a bad number.
+
+**§14.5 reinterpreted, not redefined.** "Fully on-device, no network calls" was written for a
+phone with local storage. A static-hosted web app has no "device" of its own — the host only
+serves app code. Restated for this context: **no respondent data (photos, OCR output, Excel)
+ever leaves the browser it was captured in.** The static host never receives or touches that
+data. This is the same privacy property, stated in the vocabulary that applies to a browser.
+
+**A property to preserve, and a new risk to name honestly.** CLAUDE.md requires the parser to be
+testable outside the UI. In Dart this meant a plain CLI with no Flutter dependency. In TS, the
+docx-model and confidence/flagging logic can stay pure and unit-testable the same way (e.g. with
+Vitest, no browser). But grid detection and OCR are Canvas/WASM-dependent and **cannot run in
+plain Node without a headless-browser or a `node-canvas` shim** — a real difference from the Dart
+CLI story. WT-1 verifies which testing approach actually works before WT-3 depends on it.
+
+**What we give up:** a second implementation of the same parsing logic to maintain if the mobile
+track resumes, and a browser environment that's harder to unit-test than a plain Dart CLI.
+
+**What would change this:** if the mobile track becomes testable again (Mac/Xcode access
+restored) and the web track's numbers (WT-3, WT-4) come back materially worse than what ML Kit
+would likely give, that's a reason to deprioritize the web track back to "reference only" rather
+than keep maintaining two parsers.
+
+**Confidence:** High on the substitutions being workable in principle (all are shipped, verified
+libraries). Unknown on Tesseract.js's real accuracy on Devanagari handwriting — same posture as
+DR-006 always had, just with a different library underneath.
 
 ## 5. Architecture
 
@@ -609,6 +706,46 @@ flagger that looks good.
 
 ---
 
+## 6.1 Web track (WT) component build order — DR-009
+
+Parallel, stopgap track. Same risk-first ordering as §6, same one-component-at-a-time discipline.
+Runs in a browser, so every component here is testable on the Mac immediately — no SDK, no
+Xcode, no device.
+
+| # | Component | Why here | Done when | Status |
+|---|---|---|---|---|
+| WT-1 | Web walking skeleton | Proves the toolchain and hosting before any real work | Vite+React+TS scaffold deploys to a free static host; Tesseract.js loads and recognizes a trivial string in-browser; IndexedDB read/write works; ExcelJS produces a downloadable `.xlsx` that opens correctly — all four verified with real output on the Mac | **Built and verified locally 2026-09-13 — not yet deployed; see status note below** |
+| WT-2 | docx → questionnaire model → Excel template | Same reasoning as mobile Component 2 | Parses `Student_Survey_Bilingual.docx` to exactly 71 items with correct codes and both languages via mammoth.js; emits an Excel with working construct formulas | Not started |
+| WT-3 | Grid + row anchoring spike | The riskiest thing in the web track, same as mobile Component 3 | Runs against all 6 sample pages in-browser; reports code-column recall and cell-boundary accuracy with a rendered overlay | Not started |
+| WT-4 | Mark detection + handwriting recognition + labelled measurement harness | Where DR-006's real web-track accuracy surfaces | Same Definition of Done as mobile Component 4 — accuracy and flagger recall reported separately for marks/handwriting and ticks/dots; real Tesseract.js Devanagari number, not assumed | Not started |
+| WT-5 | Capture flow | First user-facing piece | File-input camera capture and gallery pick both work, tested on a phone browser and a desktop browser | Not started |
+| WT-6 | Identity + review screen | Implements DR-008 in the browser | Browser-prefixed auto-ID assigned and displayed; flagged items listed with the page image cropped to the row; correction writes through | Not started |
+| WT-7 | Store + Excel writer + merge | Turns parsed data into the thing actually used | IndexedDB persistence round-trips; ExcelJS export opens in Excel; multiple browsers'/devices' exports concatenate without collision, same device-tag approach as §5.2 | Not started |
+| WT-8 | Deploy | Ship | Static site live on GitHub Pages or Netlify; confirmed reachable and functional from a phone browser and a desktop browser, not just the Mac | Not started |
+
+**WT-1 is the immediate priority** — it directly answers "I can't test mobile app currently,"
+verifiable with `npm run dev` and a browser tab, no native toolchain.
+
+**WT-1 status note (2026-09-13).** Built and verified locally; not yet deployed (pending your
+go-ahead to commit/push, since that's a shared, visible action):
+
+| Done-when item | Result |
+|---|---|
+| Vite+React+TS scaffold builds | ✅ Verified — `npm run build` succeeds. **Real finding:** the scaffold's default `npm create vite@latest` pulled **Vite 8.3.0**, whose new default bundler (Rolldown, a Rust/WASM replacement for Rollup) failed to load its native binding on this Mac (`Cannot find native binding` — a known npm optional-dependency bug). Pinned to **Vite 7.3.6** instead (classic Rollup/esbuild pipeline, no native-binding risk) — same reasoning as DR-002's stance on WIP tooling. TypeScript pinned to `^7.0.2` (current stable; the scaffold's default `~5.7.2` guess in DR-009 was wrong — TypeScript's own version numbering has moved to major version 7). |
+| Tesseract.js loads and recognizes text | ✅ Verified two ways: (1) under plain Node/Vitest, against a real fixture image (`src/fixtures/eng_bw.png`, Tesseract.js's own public OCR test image) — read the printed text at 92% confidence with zero browser involved; (2) in a real headless-Chromium browser (Playwright), OCR against a canvas-drawn "RESEARCH APP" string — read correctly at 96% confidence. **Real finding:** Tesseract.js downloads its ~5 MB language-data file (`eng.traineddata`) to the working directory at runtime by default — added to `.gitignore`; production will need an explicit `langPath`/cache strategy, not the default. |
+| IndexedDB read/write works | ✅ Verified in the real browser — round-tripped a record via `idb`. Browser-only by nature; not unit-tested under Node. |
+| ExcelJS produces a working `.xlsx` | ✅ Verified three ways: Node round-trip test (formula + cell fill both survive a re-read), `file`/`unzip` confirm a real OOXML archive, and an actual browser-triggered download (via Playwright) produces the same valid file. |
+| **Testability property (the open question DR-009 flagged)** | ✅ **Resolved, better than expected.** Tesseract.js and ExcelJS both run under plain Node/Vitest with no headless-browser shim and no `node-canvas` — stronger than the Dart CLI story mobile had. The caveat still stands for WT-3's own hand-written Canvas grid-detection code, which does need a DOM `<canvas>` (browser or a jsdom+canvas shim) — that's a separate, still-open question for WT-3. |
+| UI renders correctly | ✅ Verified via a real Playwright screenshot, not just build success — caught and fixed one real bug in the process: `index.css`'s inherited `line-height` (computed from the 18px root font) made the 56px `<h1>` overlap itself. Fixed by setting an explicit `line-height` on `h1`. |
+| Deployed to a free static host | ❌ **Not done yet.** A GitHub Actions workflow (`.github/workflows/deploy-web.yml`) is written and ready — builds on push to `main` (or manual dispatch), runs the test suite, then publishes `web/dist` to GitHub Pages at `https://shruti9805.github.io/research-app/`. Needs your go-ahead to commit and push, since pushing and enabling a repo setting are visible, shared-state actions this project's conventions ask to confirm first. |
+
+**What this means:** WT-1's local work is done and verified with real output at every step, per
+CLAUDE.md's evidence rule. The only remaining step is yours to authorize: commit, push, and
+enable GitHub Pages on the repo (one-time repo setting). Once that's done, WT-1 is fully Done and
+WT-2 (docx → questionnaire model → Excel template) can start.
+
+---
+
 ## 7. Risks
 
 | Risk | Likelihood | Impact | Early signal | Mitigation |
@@ -624,6 +761,8 @@ flagger that looks good.
 | Paper-to-record traceability lost | Medium | Medium — weakens flag review | Component 6 | Write assigned ID on the form at capture |
 | Photo quality varies by phone and lighting | Medium | Medium | Component 5 | Capture guidance overlay; reject and re-shoot on blur |
 | App size from two ML Kit models | High | Low | Component 1 | Both Latin and Devanagari required by DR-006; ~76 MB of models |
+| **Web OCR (Tesseract.js) weaker than ML Kit on Devanagari handwriting** | **Medium-high** | **High — same four fields at greater risk than on mobile** | WT-4 numbers | Same flag/review path as mobile; DR-009 reversible on measurement, same as DR-006 |
+| Parser logic must eventually be re-implemented in Dart if the mobile track resumes | High if mobile resumes | Medium — maintenance cost, not a correctness risk | N/A — known at decision time | Accepted in DR-009 as the cost of testing now instead of waiting |
 
 The top two rows are the ones to watch. Both resolve early — one at Component 4, one as soon as
 you've looked through the stack.
@@ -702,3 +841,5 @@ harder on stored page crops instead, which is weaker but workable.
 | 2026-09-12 | Demographic capture specified (§5.1) — all eight Part A fields, EN/HI reconciliation rules, blank-reason taxonomy (§5.2). Excel column order fixed. Q20 raised on school attendance. |
 | 2026-09-12 | Near-duplicate detection **dropped** at user's decision — duplicates prevented by operator discipline instead. Component 6 scope reduced; risk reclassified as accepted. Device prefix and write-ID-on-paper both retained, being separate concerns. |
 | 2026-09-12 | **Component 1 built and partially verified.** Flutter 3.47.4 scaffold created, dependencies added, `lib_main.dart` copied in and verified correct against installed package source (no changes needed — DR-003/DR-006 ML Kit usage matches the real 0.17.1 API). Fixed a real bug in `setup.sh`: its iOS deployment-target step targeted `ios/Podfile`, which current `flutter create` no longer generates at scaffold time, so the step silently no-op'd; rewritten to set `IPHONEOS_DEPLOYMENT_TARGET` directly in `project.pbxproj`. Replaced the stale default `test/widget_test.dart` (referenced the template's `MyApp`/counter, not `CaptureApp`). `flutter analyze` and `flutter test` both pass clean. DR-007 answered and cited. **Not verified:** `flutter build apk --release` (fails — no Android SDK; this session's network policy blocks `dl.google.com`, the only source for it) and `flutter build ipa` (impossible on any Linux host — requires Xcode/macOS). Both require your Mac; see the handoff note. Component 1 is not marked Done. |
+| 2026-09-13 | **WT-1 built and verified locally.** Vite+React+TS scaffold created; pinned Vite to 7.3.6 and TypeScript to ^7.0.2 after the default `npm create vite@latest` pulled Vite 8.3.0, whose new Rolldown bundler failed to load its native binding on this Mac (a known npm optional-dependency bug) — chose the mature Rollup/esbuild pipeline instead, same posture as DR-002. Built and verified, with real output at each step: Tesseract.js OCR (Node + real browser, both passed, 92–96% confidence), IndexedDB round-trip (browser), ExcelJS workbook with a live formula and a filled cell (Node round-trip + real browser download, both valid `.xlsx` files). Found and fixed one real CSS bug (`h1` line-height) caught via an actual Playwright screenshot, not just a successful build. Resolved the open testability question from DR-009: Tesseract.js and ExcelJS both run under plain Node/Vitest with no browser shim — WT-3's own Canvas-based grid detection still needs one, that question stays open for WT-3. Not yet deployed — a GitHub Actions → GitHub Pages workflow is written and ready, pending the user's go-ahead to commit/push. |
+| 2026-09-13 | **DR-009 added — web stopgap track.** User cannot currently test mobile builds (no Mac/Xcode/Android SDK access in this session). Rather than replace the mobile plan, added a **parallel, paused-not-deleted** web track: plain TypeScript (Vite+React), not Flutter Web, because ML Kit — load-bearing for DR-003 and DR-006 — has no web build at all `[VERIFIED]`. Confirmed with the user: (1) stopgap, not replacement — DR-001 and DR-007 status changed to Paused; (2) plain TS/React over Flutter Web; (3) DR-006 handwriting recognition stands, with the heightened Tesseract.js-vs-Devanagari risk named explicitly; (4) deploy to a free static host (GitHub Pages/Netlify) rather than local-only. Library substitutions recorded in DR-009 (Tesseract.js, hand-written Canvas TS with OpenCV.js as an unverified fallback, mammoth.js, ExcelJS, IndexedDB). New §6.1 web-track (WT-1..WT-8) component table added, mirroring §6's risk-first order. Two new risks added to §7: Tesseract.js's weaker Devanagari-handwriting accuracy, and the accepted cost of eventually re-implementing the parser in Dart if the mobile track resumes. No code written yet — WT-1 is the next component, to be built and verified separately. |
