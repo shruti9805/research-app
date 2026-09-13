@@ -2,35 +2,67 @@
 
 Last updated: 2026-09-13 | Current stage: **2** | Two tracks active — see DR-009.
 
-- **Mobile track (active again, 2026-09-13):** user chose to shift back to mobile after WT-3's web-track OCR accuracy came back too low. Toolchain installed on the real Mac (Flutter, JDK, Android SDK); `flutter build apk --release` succeeds (78.2MB, real ML Kit dependency bug found and fixed). **Component 1: all 4 health checks verified passing on an Android emulator** (via the user's own Android Studio install), including ML Kit Devanagari actually initializing at runtime. Not yet on a physical phone; iOS/IPA deferred by choice (Android-only for now). **Component 2: Done** — pure-Dart `parser/` package parses the real docx to 71 items/12 constructs and emits a working Excel template, verified via CLI and tests, no Flutter/UI dependency. Ready to move to Component 3 (grid + row anchoring spike, mobile's own version — separate from the web track's already-spiked one).
+- **Mobile track (active again, 2026-09-13):** user chose to shift back to mobile after WT-3's web-track OCR accuracy came back too low. Toolchain installed on the real Mac (Flutter, JDK, Android SDK). **Component 1: Done** for the Android-only path — all 4 health checks verified on an emulator. **Component 2: Done** — pure-Dart `parser/` package parses the real docx, verified via CLI and tests. **Component 3: spiked, not resolved** — real on-device measurement shows ML Kit code-column recall at 29.6%, *lower* than the web track's Tesseract.js (35.2%) on the identical images, directly contradicting the reason mobile was chosen over web. Grid detection (DR-002) also unreliable, same as the web track, now cross-validated in two languages. **This needs the user's decision before proceeding — see the Resume point below.**
 - **Web track (active):** stopgap so the app can be tested without mobile hardware. **WT-1 and WT-2 are Done** — live at https://shruti9805.github.io/research-app/. **WT-3 (grid + row anchoring spike) is spiked but not resolved** — real measurement (35.2% code-column recall) triggers both DR-002's and DR-003's documented fallback conditions; this is a decision point for the user, not a pass. See §6.1's WT-3 status note.
 
 ---
 
-## Resume point (2026-09-13) — read this first if picking this back up
+## Resume point (2026-09-13, latest) — read this first if picking this back up
 
-**The web-track OCR decision from earlier today is resolved: option 3.** WT-3 came back with
-35.2% code-column recall (§6.1's WT-3 status note has full detail — read it before touching that
-component again, so the gap-bridging/render-scale/cropping experiments already tried aren't
-redone). The user rejected that accuracy outright and chose to **shift back to the mobile track**,
-on the real Mac, rather than keep tuning Tesseract.js. The web track's code all stays on
-`claude/practical-planck-oqdsid`, pushed, as reference — nothing deleted, just not the active
-line of work.
+**The single most important fact right now: switching to mobile did not fix the accuracy
+problem it was chosen to fix.** The user moved from the web track to mobile specifically because
+"ML Kit has higher accuracy" than the web track's Tesseract.js (35.2% code-column recall, WT-3).
+Mobile Component 3's real, measured result — ML Kit Latin, run on-device via an Android emulator,
+against the exact same 6 rendered sample pages — is **21/71 = 29.6% code-column recall, *lower*
+than Tesseract.js's 35.2% on the same images.** This is a genuine, reproduced, on-device
+measurement, not a guess, and it directly contradicts the premise the mobile shift was made on.
+**This has not yet been discussed with the user or decided on — say this plainly and ask, don't
+just keep building.** Full detail, what was tried, and the real bug fixed along the way are in the
+Component 3 (mobile) status note in §6.
 
-**Mobile is now active and past its old blocker.** The whole reason mobile was paused (DR-009) was
-this session having no Mac/Xcode/Android-SDK access. That's no longer true — this session runs
-directly on the user's Mac. Set up Flutter, a JDK, and the Android SDK from scratch (no
-sudo/Homebrew needed); found and fixed two real bugs (wrong SDK version assumed; an R8 build
-failure from `google_mlkit_text_recognition`'s `compileOnly` script dependencies). **Component 1's
-4 health checks now verify passing on a real running emulator**, including ML Kit Devanagari
-actually initializing — see the Component 1 status note in §6 for the full trail. Not yet
-verified on physical hardware; iOS/Xcode deferred by the user's explicit choice (Android-only for
-now, matching DR-007's documented fallback).
+**Everything that led here, in order:**
 
-**Next up:** Component 2 (docx → questionnaire model → Excel template), the mobile-track
-equivalent of what WT-2 already built for the web. The Dart parser logic can likely borrow
-directly from `web/src/lib/questionnaire.ts`'s approach (verified against the real docx: 71 items,
-12 constructs, exact counts in PRODUCT.md §11.1) — same structure, different language.
+1. **Web track (WT-1..WT-3):** built and deployed (live at
+   https://shruti9805.github.io/research-app/). WT-3 (Tesseract.js code-column OCR) measured
+   35.2% recall — user rejected this and asked to shift to mobile. Web track's code stays on
+   `claude/practical-planck-oqdsid`, pushed, as reference; nothing deleted.
+2. **Mobile toolchain stood up from scratch** on the user's real Mac (previously blocked — DR-009
+   paused mobile specifically because this session had no Mac/Xcode/Android-SDK access; that
+   blocker is gone now). Flutter, a JDK, and the Android SDK were installed with no sudo/Homebrew
+   needed. Found and fixed two real bugs: the project had assumed the wrong Android SDK version,
+   and `google_mlkit_text_recognition` needed an explicit Devanagari dependency plus ProGuard
+   rules the plugin's own docs specify but this project hadn't added yet.
+3. **Mobile Component 1:** all 4 health checks verified passing on a real running Android
+   emulator (set up via the user's own Android Studio install, after command-line `sdkmanager`
+   failed 3 times on the same system-image download) — including ML Kit Devanagari actually
+   initializing at runtime, not just compiling. Not yet on physical hardware; iOS/Xcode stays
+   deferred by the user's explicit choice (Android-only for now, DR-007's documented fallback).
+4. **Mobile Component 2:** Done. A pure-Dart `parser/` package (no Flutter dependency, genuinely
+   CLI-testable) parses the real docx to 71 items / 12 constructs and emits a working Excel
+   template. Found and fixed a real UTF-8 decoding bug along the way (Devanagari text was coming
+   out as mojibake).
+5. **Mobile Component 3 (the one that matters right now):** split in two, since ML Kit can only
+   run inside the Flutter app (platform channels), not a bare `dart run` CLI, while ruled-line
+   grid detection needs no ML Kit at all.
+   - **Grid detection (DR-002):** ported the web track's exact algorithm (gap-bridging +
+     longest-run) to Dart, ran it as a real CLI against the 6 real page images. Same unreliable,
+     partial result as the web track — **this is now cross-validated in two independent
+     language implementations**, meaningfully stronger evidence that hand-rolled projection
+     profiles are genuinely insufficient for this scan, not a one-off bug.
+   - **Code-column OCR (DR-003):** ML Kit Latin, run for real on-device. **21/71 = 29.6% recall —
+     lower than the web track's Tesseract.js number on the identical images.** Getting a real
+     number at all required finding and fixing a genuine bug first: the initial attempt loaded
+     images from `/sdcard/Download/`, which Android's scoped storage silently denied
+     (`EACCES`) — the uncaught exception left the UI stuck on "Running…" indefinitely, looking
+     like a hang rather than an error, for over 3 hours of wall-clock time before the real cause
+     was found in `adb logcat`. Fixed by bundling the images as Flutter assets and copying them
+     to the app's own private temp directory before handing a real file path to ML Kit.
+
+**Next action, in order:** (1) tell the user the 29.6% vs 35.2% finding plainly, since it
+contradicts why they chose mobile in the first place — don't decide a direction unilaterally;
+(2) whatever they choose, Component 4 (mark detection + measurement harness) and mobile
+Component 3's still-unresolved grid-detection half both remain open regardless of the OCR
+engine question.
 
 ---
 
@@ -678,7 +710,7 @@ Ordered by risk retired, not by layer.
 |---|---|---|---|---|
 | 1 | Walking skeleton | Toolchain and the iOS unknown (DR-007) surface on day one, not week six | Blank Flutter app builds, runs on a real Android phone from clean checkout; `flutter build ipa` succeeds on your Mac; DR-007's unknown answered in writing | **All 4 health checks verified passing 2026-09-13 — on an emulator, not yet a physical phone; iOS/IPA deferred by choice. See note below — not marked fully Done against the original DoD.** |
 | 2 | docx → questionnaire model → Excel template | Deterministic, no images, fully verifiable against your real file; unblocks everything downstream | Parses `Student_Survey_Bilingual.docx` to exactly 71 items with correct codes and both languages; emits an Excel that opens in Excel with working construct formulas | **Done — 2026-09-13. See status note below.** |
-| 3 | **Grid + row anchoring spike** | **The riskiest thing in the project.** Resolves DR-002 and DR-003 while the plan is still cheap to change | Runs as a plain Dart CLI over all 6 sample pages; reports code-column recall and cell-boundary accuracy with a rendered overlay to eyeball | Not started |
+| 3 | **Grid + row anchoring spike** | **The riskiest thing in the project.** Resolves DR-002 and DR-003 while the plan is still cheap to change | Runs as a plain Dart CLI over all 6 sample pages; reports code-column recall and cell-boundary accuracy with a rendered overlay to eyeball | **Spiked — 2026-09-13. Real numbers: grid detection unreliable (same as web track); ML Kit code-column recall 29.6%, lower than the web track. Decision point, not a pass. See status note below.** |
 | 4 | Mark detection + **handwriting recognition** + labelled measurement harness | Where S1–S3 are proven or disproven, and where DR-006's real accuracy surfaces | Hand-labelled ground truth for all 71×6 cells **and the four text fields**; harness reports accuracy, flagger recall and signed bias **separately for marks and for handwriting**; S1–S3 met or a written explanation of why not | Not started |
 | 5 | Capture flow | First user-facing piece; safe now that parsing is understood | Camera and gallery both work; 6 pages assembled into one response; add-one-at-a-time with explicit done | Not started |
 | 6 | Identity + review screen | Implements DR-008 and makes flags actionable | Device-prefixed auto-ID assigned and displayed for writing on the form; printed codes stored when present; code-vs-handwriting cross-check flags disagreement; flagged items listed with the page image cropped to the row; correction writes through | Not started |
@@ -798,15 +830,39 @@ did require.
 | Emits an Excel with working construct formulas | ✅ Verified three ways: a unit test on a small hand-built questionnaire (formula string references the exact right column range), a real CLI run against the actual 71-item file producing a valid `.xlsx` (`file` confirms "Microsoft Excel 2007+", `unzip -l` shows real OOXML parts), and the exact same 12-construct breakdown as WT-2's independent TypeScript implementation. |
 | Testable outside any UI | ✅ Fully — more so than the web track even. `dart run bin/parse_questionnaire.dart samples/Student_Survey_Bilingual.docx` runs in under a second, prints the parse summary, writes the `.xlsx`. `dart test` runs all 7 tests in well under a second. `dart analyze`: zero issues. |
 
-**Not yet wired into the Flutter app itself** — Component 2's DoD doesn't require that (later
-components do: Component 5 capture flow, Component 6 review screen, Component 7 store/writer).
-Adding `app/pubspec.yaml` → `questionnaire_parser: {path: ../parser}` is a one-line change when
-that wiring is actually needed; not done now to avoid scope creep ahead of the components that
-need it.
+**Update from Component 3's work:** `questionnaire_parser` is now wired into `app/pubspec.yaml`
+as a path dependency after all — Component 3's ML Kit spike needed the parser's pure-logic
+`matchCodes`/`OcrWord` types from inside the Flutter app. Required downgrading `app`'s own
+`image` constraint from `^4.9.2` to `^4.3.0` to keep the combined dependency graph resolvable
+(the parser's `archive` constraint, driven by `excel`, caps how new a `image` version can be) —
+worth knowing before adding more shared dependencies between `app/` and `parser/`.
+
+**Component 3 (mobile) status note (2026-09-13) — the important one, read in full before
+proceeding.** Split into two halves, since ML Kit only runs inside the Flutter app (platform
+channels) while ruled-line detection needs no ML Kit at all:
+
+| Half | Result |
+|---|---|
+| **Grid detection (DR-002)** | ⚠️ Ported the web track's exact algorithm (`gridDetection.ts`/`tableDetection.ts` → `parser/lib/src/grid_detection.dart`/`table_detection.dart`) and ran it as a real CLI (`dart run bin/grid_spike.dart`) against the 6 real rendered page images. **Same unreliable, partial detection as the web track** — most page-halves find 0 lines, a few find a handful. This is now **cross-validated in two independent language implementations**, stronger evidence than either alone that hand-rolled projection profiles are genuinely insufficient for this real scan (not a one-off bug in one codebase). |
+| **Code-column OCR (DR-003)** | ⚠️ **21/71 = 29.6% recall — lower than the web track's Tesseract.js result (35.2%) on the identical 6 images.** Real, on-device measurement via `TextRecognizer(script: latin)` in a new app screen (`grid_spike_page.dart`), run on the Android emulator. **This directly contradicts the reason the user gave for shifting to mobile** ("ML Kit has higher accuracy") — flagged plainly in the Resume point at the top of this file, not decided on unilaterally. |
+
+**A real bug found and fixed getting this measurement at all, worth knowing about for any future
+on-device file access:** the first attempt loaded the 6 sample images from `/sdcard/Download/`
+(pushed via `adb push`). Android's scoped storage (this emulator runs API 34) silently denied the
+read with `EACCES` — and because the code didn't catch per-page errors, the uncaught exception
+left the UI stuck on "Running…" **indefinitely**, indistinguishable from a real hang, until
+`adb logcat` was checked directly (over 3 hours of wall-clock time had passed by then, though
+that reflects gaps between conversation turns, not 3 hours of the emulator actually spinning).
+Fixed two ways at once: (1) bundle the images as Flutter assets instead of relying on shared
+storage at all, sidestepping scoped-storage permissions entirely; (2) wrap each page's processing
+in its own try/catch so one failure reports an error on that page instead of silently killing the
+whole run. The second fix matters independently of the first — it's what would have made this
+diagnosable in seconds instead of hours if it happened again.
 
 **Component 3 is the gate.** If projection profiles can't find the grid reliably on real scans,
 DR-002 flips to `opencv_core` and the toolchain requirement changes. Better to learn that in
-week one.
+week one. **Both halves of that gate have now been tried and both came back weak — this remains
+unresolved, not passed.**
 
 **Component 4 is the honest one.** It's where we find out whether 99% is reachable on your actual
 handwriting. If it isn't, you'll get the real number and the real flag rate, not a tuned-down
@@ -1018,6 +1074,7 @@ harder on stored page crops instead, which is weaker but workable.
 | 2026-09-12 | Demographic capture specified (§5.1) — all eight Part A fields, EN/HI reconciliation rules, blank-reason taxonomy (§5.2). Excel column order fixed. Q20 raised on school attendance. |
 | 2026-09-12 | Near-duplicate detection **dropped** at user's decision — duplicates prevented by operator discipline instead. Component 6 scope reduced; risk reclassified as accepted. Device prefix and write-ID-on-paper both retained, being separate concerns. |
 | 2026-09-12 | **Component 1 built and partially verified.** Flutter 3.47.4 scaffold created, dependencies added, `lib_main.dart` copied in and verified correct against installed package source (no changes needed — DR-003/DR-006 ML Kit usage matches the real 0.17.1 API). Fixed a real bug in `setup.sh`: its iOS deployment-target step targeted `ios/Podfile`, which current `flutter create` no longer generates at scaffold time, so the step silently no-op'd; rewritten to set `IPHONEOS_DEPLOYMENT_TARGET` directly in `project.pbxproj`. Replaced the stale default `test/widget_test.dart` (referenced the template's `MyApp`/counter, not `CaptureApp`). `flutter analyze` and `flutter test` both pass clean. DR-007 answered and cited. **Not verified:** `flutter build apk --release` (fails — no Android SDK; this session's network policy blocks `dl.google.com`, the only source for it) and `flutter build ipa` (impossible on any Linux host — requires Xcode/macOS). Both require your Mac; see the handoff note. Component 1 is not marked Done. |
+| 2026-09-13 | **Component 3 (mobile) spiked — real number contradicts why mobile was chosen.** ML Kit code-column recall: 21/71 = 29.6%, on-device via the emulator, real measurement — *lower* than the web track's Tesseract.js result (35.2%) on the identical 6 images. Grid detection (DR-002): ported the web track's algorithm to Dart, ran as a CLI, same unreliable partial result — now cross-validated in two languages. Found and fixed a real bug getting the OCR measurement at all: loading images from `/sdcard/Download/` hit Android's scoped-storage `EACCES`, and the uncaught exception left the UI silently stuck on "Running…" for hours before `adb logcat` revealed the real cause. Fixed by bundling images as Flutter assets + per-page try/catch so future failures report immediately instead of hanging silently. This is a decision point, not resolved — written up in the Resume point at the top of this file and in §6's Component 3 status note, pending the user's call. |
 | 2026-09-13 | **Component 2 (mobile) Done: pure-Dart docx parser + Excel template, verified against the real file.** Built at `parser/`, a standalone package with no Flutter dependency, exactly the "runs as a CLI in seconds" property CLAUDE.md requires. Parses raw OOXML XML directly (archive + xml packages) rather than through an HTML-conversion layer, unlike the web track's approach — no DOM needed. Reused WT-2's already-verified real-file structure (71 items, 12 constructs) but found and fixed a new, real bug in the Dart version: an early pass used `String.fromCharCodes` on the zip bytes instead of `utf8.decode()`, silently turning every Devanagari character into mojibake — caught by printing and reading the actual output. `dart test`: 7/7 pass. `dart analyze`: clean. CLI run against the real docx produces a valid, verified `.xlsx` matching WT-2's independent construct breakdown exactly. Not wired into the Flutter app yet — not needed until later components. |
 | 2026-09-13 | **Component 1's 4 health checks verified passing on a real running Android environment.** User installed Android Studio and used its Virtual Device Manager to get a system image (succeeded where command-line `sdkmanager` had failed three times on the same file). Installed the already-built `app-release.apk` via `adb install`, launched it, screenshotted the result: all 4 checks pass, including ML Kit Devanagari actually initializing at runtime — the real proof the R8/dependency fix works, not just that it compiles. Ran on an emulator, not yet a physical phone; iOS/IPA remains deferred by the user's own choice (Android-only for now, per DR-007's documented fallback). Component 1 is Done for what the Android-only path can currently verify, not fully Done against the original six-item DoD. |
 | 2026-09-13 | **Shifted back to the mobile track; real Android toolchain set up from scratch on the actual Mac.** User rejected the web track's OCR accuracy (WT-3, 35.2% recall) and asked to focus on mobile instead. Installed Flutter 3.47.4, Temurin JDK 17, and the Android SDK directly (no sudo/Homebrew needed). Found and fixed a real bug: Flutter 3.47.4 wants Android SDK 36 + build-tools 28.0.3, not 34/34.0.0. Found and fixed a real R8 build failure: `google_mlkit_text_recognition` marks non-Latin scripts `compileOnly`, so Devanagari needed an explicit dependency add (per the plugin's own README) and Chinese/Japanese/Korean needed `-dontwarn` ProGuard rules for the scripts this app deliberately excludes. `flutter build apk --release` now succeeds — a real 78.2MB APK, matching the expected size for bundling Latin + Devanagari models. Device-level verification (installing on a real phone, confirming the four health checks) is still pending: no physical device available, and an emulator system image failed three times with real, reproduced "Connection reset" errors. |

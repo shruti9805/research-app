@@ -21,6 +21,8 @@ import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'grid_spike_page.dart';
+
 void main() {
   runApp(const CaptureApp());
 }
@@ -210,6 +212,13 @@ class _HealthCheckPageState extends State<HealthCheckPage> {
                       'Do not start Component 2 until then.',
                     ),
                   ),
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const GridSpikePage()),
+                  ),
+                  child: const Text('Component 3 — Code-Column OCR spike'),
                 ),
               ],
             ),
