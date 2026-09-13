@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { recognizeText } from './lib/ocr'
 import { storageRoundTrip } from './lib/storage'
 import { buildHealthCheckWorkbook } from './lib/excel'
+import { parseQuestionnaireDocx, type Questionnaire } from './lib/questionnaire'
+import { buildQuestionnaireTemplate } from './lib/questionnaireExcel'
 import './App.css'
 
 type CheckStatus = 'pending' | 'pass' | 'fail'
@@ -96,6 +98,71 @@ export default function App() {
       <button onClick={downloadWorkbook} disabled={!workbookBuffer}>
         Download test workbook (.xlsx)
       </button>
+
+      <QuestionnaireImport />
     </main>
+  )
+}
+
+function QuestionnaireImport() {
+  const [status, setStatus] = useState<'idle' | 'parsing' | 'done' | 'error'>('idle')
+  const [error, setError] = useState<string>('')
+  const [questionnaire, setQuestionnaire] = useState<Questionnaire | null>(null)
+  const [templateBuffer, setTemplateBuffer] = useState<ArrayBuffer | null>(null)
+
+  async function handleFile(file: File) {
+    setStatus('parsing')
+    setError('')
+    try {
+      const arrayBuffer = await file.arrayBuffer()
+      const parsed = await parseQuestionnaireDocx(arrayBuffer)
+      const buffer = await buildQuestionnaireTemplate(parsed)
+      setQuestionnaire(parsed)
+      setTemplateBuffer(buffer as ArrayBuffer)
+      setStatus('done')
+    } catch (err) {
+      setError(String(err))
+      setStatus('error')
+    }
+  }
+
+  function downloadTemplate() {
+    if (!templateBuffer) return
+    const blob = new Blob([templateBuffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'questionnaire-template.xlsx'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  return (
+    <section className="questionnaire-import">
+      <h2>Component WT-2 — Questionnaire Import</h2>
+      <p>Upload the blank questionnaire .docx to parse its 71 items and generate an Excel template with construct-mean formulas. See PLAN.md §6.1.</p>
+      <input
+        type="file"
+        accept=".docx"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) void handleFile(file)
+        }}
+      />
+      {status === 'parsing' && <p>Parsing…</p>}
+      {status === 'error' && <p className="questionnaire-import__error">{error}</p>}
+      {status === 'done' && questionnaire && (
+        <div className="check-card check-card--pass">
+          <span className="check-card__icon">✅</span>
+          <div>
+            <strong>Parsed {questionnaire.items.length} items across {questionnaire.constructs.length} constructs</strong>
+            <p>{questionnaire.constructs.map((c) => `${c.code}:${c.itemCodes.length}`).join('  ')}</p>
+            <button onClick={downloadTemplate}>Download questionnaire template (.xlsx)</button>
+          </div>
+        </div>
+      )}
+    </section>
   )
 }

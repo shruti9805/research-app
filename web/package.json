@@ -10,18 +10,19 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "exceljs": "^4.4.0",
+    "idb": "^8.0.3",
+    "mammoth": "^1.12.3",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "tesseract.js": "^7.0.0",
-    "exceljs": "^4.4.0",
-    "idb": "^8.0.3"
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^5.2.0",
-    "jsdom": "^30.0.1",
+    "jsdom": "^26.1.0",
     "typescript": "^7.0.2",
     "vite": "^7.3.6",
     "vitest": "^5.0.0"

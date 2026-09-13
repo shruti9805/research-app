@@ -54,3 +54,23 @@ button {
   font-size: 1rem;
   cursor: pointer;
 }
+
+.questionnaire-import {
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #ccc;
+}
+
+.questionnaire-import .check-card {
+  margin-top: 1rem;
+}
+
+.questionnaire-import .check-card button {
+  margin-top: 0.75rem;
+}
+
+.questionnaire-import__error {
+  color: #c0392b;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
