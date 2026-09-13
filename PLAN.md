@@ -7,6 +7,36 @@ Last updated: 2026-09-13 | Current stage: **2** | Two tracks active — see DR-0
 
 ---
 
+## Resume point (2026-09-13) — read this first if picking this back up
+
+**Where things actually stand:** WT-1 and WT-2 are Done and live. WT-3 is **spiked, not resolved**
+— real code on `claude/practical-planck-oqdsid`, all pushed, all tests passing, but the core
+question it was built to answer came back bad: 35.2% code-column recall on the one real filled
+response, against a ~95% bar. Full detail, including everything tried and measured, is in §6.1's
+WT-3 status note — read that before touching this component again, so effort already spent
+(gap-bridging, render-scale tuning, the cropping experiment that made things worse) isn't redone.
+
+**The open decision, not yet made:** the user asked whether ML Kit could be used instead of
+Tesseract.js for the web track. Verified answer: no — ML Kit has no web/JS build at all, it's
+Android/iOS-native only, which is the entire reason DR-009 chose Tesseract.js in the first place.
+Four real options were laid out and **none has been chosen yet**:
+
+1. Improve Tesseract.js's accuracy — preprocessing (deskew, contrast/adaptive threshold) and a
+   different Tesseract page-segmentation mode are genuinely untried.
+2. Switch to a cloud OCR API — likely much more accurate, but reverses §14.5's no-cloud-processing
+   decision and sends minors' response images to a third-party server. A real privacy tradeoff,
+   not a technical one — needs the user's explicit sign-off, not an assumption.
+3. Pause the web track, resume the mobile/ML-Kit track once Mac/Android-SDK access exists again.
+4. Accept the current recall, lean on the flag/review workflow, and revisit once more real filled
+   samples exist to see whether this is a one-form quirk or a genuine Tesseract.js ceiling —
+   which would also matter for DR-006's handwriting recognition, since it's the same OCR engine.
+
+**Do not pick one of these unilaterally.** Ask the user which direction they want before writing
+more WT-3 code, per CLAUDE.md's rule to stop and report rather than resolve a plan-contradicting
+finding silently.
+
+---
+
 ## 0. Read this first — three things that change the plan
 
 Before the technology, three findings from your answers that need a decision from you. Two are
@@ -910,6 +940,7 @@ harder on stored page crops instead, which is weaker but workable.
 | 2026-09-12 | Demographic capture specified (§5.1) — all eight Part A fields, EN/HI reconciliation rules, blank-reason taxonomy (§5.2). Excel column order fixed. Q20 raised on school attendance. |
 | 2026-09-12 | Near-duplicate detection **dropped** at user's decision — duplicates prevented by operator discipline instead. Component 6 scope reduced; risk reclassified as accepted. Device prefix and write-ID-on-paper both retained, being separate concerns. |
 | 2026-09-12 | **Component 1 built and partially verified.** Flutter 3.47.4 scaffold created, dependencies added, `lib_main.dart` copied in and verified correct against installed package source (no changes needed — DR-003/DR-006 ML Kit usage matches the real 0.17.1 API). Fixed a real bug in `setup.sh`: its iOS deployment-target step targeted `ios/Podfile`, which current `flutter create` no longer generates at scaffold time, so the step silently no-op'd; rewritten to set `IPHONEOS_DEPLOYMENT_TARGET` directly in `project.pbxproj`. Replaced the stale default `test/widget_test.dart` (referenced the template's `MyApp`/counter, not `CaptureApp`). `flutter analyze` and `flutter test` both pass clean. DR-007 answered and cited. **Not verified:** `flutter build apk --release` (fails — no Android SDK; this session's network policy blocks `dl.google.com`, the only source for it) and `flutter build ipa` (impossible on any Linux host — requires Xcode/macOS). Both require your Mac; see the handoff note. Component 1 is not marked Done. |
+| 2026-09-13 | **Paused on the user's request to document state for a clean resume, not to pick a WT-3 direction.** User asked whether ML Kit could replace Tesseract.js for the web track — verified no (ML Kit has no web/JS build, Android/iOS-native only, the reason DR-009 chose Tesseract.js in the first place). Four options were laid out (improve Tesseract preprocessing; switch to a cloud OCR API, which reverses §14.5; pause web and resume mobile once hardware access exists; accept the gap and revisit with more samples) — none chosen. Added a "Resume point" section at the top of this file so a future session picks this up correctly without redoing the WT-3 investigation. |
 | 2026-09-13 | **WT-3 spiked against the real filled response PDF — real number, not a pass.** Code-column recall (DR-003): 35.2% (25/71), reproduced twice, after trying 2x vs 4x render scale (14.1%→35.2%) and whole-page vs Code-column-cropped OCR (cropping made it *worse*, 35.2%→16.9%, with real Tesseract errors). Grid/cell-boundary detection (DR-002): naive full-width projection profiles found zero lines on the real scan (lines are thin, gray, and fragmented by scan noise); gap-bridging + longest-run recovered a real but partial signal (one line's continuity went from 39%→91% after bridging), not a reliable full grid. Verified with a rendered red/green overlay — matches are positionally correct when they fire, the problem is coverage. Both DR-002's and DR-003's own documented fallback-trigger conditions (OpenCV.js; <~95% recall) are now met by measurement. Not resolving this unilaterally — it's a real architecture decision point, written up in §6.1's WT-3 status note with options, pending the user's call. |
 | 2026-09-13 | **WT-2 built and verified against the real questionnaire file.** Inspected the real mammoth-converted HTML first (not assumed) to confirm table structure and the exact 12-construct/71-item breakdown from PRODUCT.md §11.1, then wrote `parseQuestionnaireDocx` to match it and throw rather than silently mis-parse if it doesn't. Verified three ways: unit tests against the real docx (71 unique items, correct construct counts, correct English/Hindi split), a real-data Excel-template check (`ER_mean`/`PC_mean` formulas reference the exact right column ranges), and a real browser upload-and-download via Playwright. Hit the same "brand-new major version breaks on this Mac's Node" pattern as WT-1's Vite issue — jsdom 30 requires Node ≥22.22, pinned to jsdom 26.1.0 instead. WT-2 is Done; WT-3 (grid + row anchoring spike) is next. |
 | 2026-09-13 | **WT-1 deployed and verified in production.** Live at https://shruti9805.github.io/research-app/, confirmed via a real Playwright run against the production URL (same three checks pass, zero console errors). Getting there surfaced a real, non-obvious obstacle: pushing the GitHub Actions workflow file required a PAT with **both** `Contents` and `Workflows` write permissions (fine-grained tokens split these; having only one fails with a misleading error). Worked around by committing the workflow file separately from the app code and adding it through GitHub's web UI instead. Also hit a known first-deploy race (`Ensure GitHub Pages has been enabled`) — resolved by confirming Settings → Pages → Source is GitHub Actions, then re-running the workflow. WT-1 is fully Done; WT-2 is next. |
